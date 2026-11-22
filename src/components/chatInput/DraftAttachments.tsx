@@ -1,12 +1,13 @@
 import clsx from 'clsx'
 import { memo, useState, type ReactNode } from 'react'
 import { useTranslate } from '../../i18n/index.js'
-import { useUploads, type UploadTask } from '../../services/attachments.js'
+import { isPreviewImage, useUploads, type UploadTask } from '../../services/attachments.js'
 import type { DraftAttachment } from '../../services/chat/drafts.js'
 import { IconCloseFill14, IconRefreshOutline16 } from '../base/icons.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { FileCard } from '../files/FileCard.js'
 import { ImagePreview } from '../files/ImagePreview.js'
+import { useImagePreviewUrl } from '../files/useFileView.js'
 import styles from './ChatInput.module.css'
 
 const UPLOADING: UploadTask = { status: 'uploading' }
@@ -24,9 +25,10 @@ export const DraftAttachments = memo(function DraftAttachments({
   onRemove: (id: string) => void
 }) {
   const [previewId, setPreviewId] = useState<string | null>(null)
-  const images = items.filter((item) => item.previewUrl !== null)
+  const images = items.filter((item) => isPreviewImage(item.file.name))
   const activeIndex = images.findIndex((item) => item.id === previewId)
   const active = images[activeIndex]
+  const previewUrl = useImagePreviewUrl(active?.file, active?.file.name ?? '')
   if (items.length === 0 && !retained) {
     return null
   }
@@ -42,9 +44,9 @@ export const DraftAttachments = memo(function DraftAttachments({
           onRemove={() => onRemove(item.id)}
         />
       ))}
-      {active?.previewUrl && (
+      {active && (
         <ImagePreview
-          src={active.previewUrl}
+          src={previewUrl ?? undefined}
           name={active.file.name}
           onClose={() => setPreviewId(null)}
           onStep={
@@ -73,6 +75,7 @@ const AttachmentItem = ({
   onPreview: () => void
 }) => {
   const t = useTranslate()
+  const previewUrl = useImagePreviewUrl(item.file, item.file.name)
   const task = useUploads((state) => state.tasks[item.id] ?? UPLOADING)
   const status = task.status
   const error = task.status === 'error' ? t(task.error.key, task.error.params) : undefined
@@ -82,7 +85,7 @@ const AttachmentItem = ({
   const retryLabel = t('uploadRetry', { message: error ?? t('uploadFileStatusFailed') })
   // 「上传失败」只显示重试图标，其余原因写在图片上：可重试时在图标下方，不可重试时贴底
   const showReason = failed && error !== undefined && error !== t('uploadFileStatusFailed')
-  return item.previewUrl ? (
+  return isPreviewImage(item.file.name) ? (
     <div
       className={clsx(styles.attachment, failed && styles.attachmentFailed)}
       title={error ?? item.file.name}
@@ -91,9 +94,10 @@ const AttachmentItem = ({
         type="button"
         className={styles.attachmentPreview}
         aria-label={t('previewImage', { name: item.file.name })}
+        disabled={!previewUrl}
         onClick={onPreview}
       >
-        <img src={item.previewUrl} alt={item.file.name} />
+        {previewUrl && <img src={previewUrl} alt={item.file.name} />}
       </button>
       {status === 'uploading' ? <div className={styles.uploading} /> : null}
       {failed ? (

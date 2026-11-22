@@ -39,7 +39,7 @@ export const ImagePreview = ({
   onClose,
   onStep,
 }: {
-  src: string
+  src: string | undefined
   name: string
   onClose: () => void
   onStep?: (direction: -1 | 1) => void
@@ -150,13 +150,13 @@ export const ImagePreview = ({
     >
       <div ref={stage} className={styles.stage}>
         <button
-          key={src}
           ref={photo}
           type="button"
           className={styles.photo}
           data-zoomed={zoomed}
           data-dragging={dragging}
           aria-label={zoomLabel}
+          disabled={!src}
           style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}
           onClick={(event) => toggleZoom(event)}
           onPointerDown={(event) => {
@@ -203,7 +203,7 @@ export const ImagePreview = ({
             }
           }}
         >
-          <img ref={image} src={src} alt={name} draggable={false} />
+          {src && <img ref={image} src={src} alt={name} draggable={false} />}
         </button>
       </div>
       <button

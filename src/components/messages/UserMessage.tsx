@@ -6,6 +6,7 @@ import { IconCloseFill14, IconEditOutline16, IconPaperclipOutline16 } from '../b
 import { editMessage, retryUpload, useChatStore } from '../../services/chat/store.js'
 import {
   ACCEPT,
+  isPreviewImage,
   MAX_COUNT,
   MAX_SIZE_MB,
   MAX_USER_DATA_SIZE_MB,
@@ -151,7 +152,7 @@ export const UserMessage = memo(function UserMessage({
               <button
                 type="button"
                 className={styles.removeAttachment}
-                aria-label={t(file.isImage ? 'removeImage' : 'removeAttachment', {
+                aria-label={t(isPreviewImage(file.name) ? 'removeImage' : 'removeAttachment', {
                   name: file.name,
                 })}
                 disabled={editorDisabled}
@@ -299,7 +300,7 @@ export const UserMessage = memo(function UserMessage({
             <div
               className={clsx(
                 styles.files,
-                files.some((file) => !file.isImage) && styles.filesWithDocuments
+                files.some((file) => !isPreviewImage(file.name)) && styles.filesWithDocuments
               )}
             >
               {savedAttachments}

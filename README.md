@@ -51,15 +51,15 @@ Settings → Data → Delete all chats clears all local conversations, original 
 
 In separate terminals, run `pnpm server:dev` and `pnpm dev`, then open [the development app](http://localhost:8090/). Rspack proxies local attachment requests to port 8091.
 
-| Command       | Description                  |
-| ------------- | ---------------------------- |
-| `pnpm dev`    | Start the Rspack frontend on port 8090 |
+| Command           | Description                                           |
+| ----------------- | ----------------------------------------------------- |
+| `pnpm dev`        | Start the Rspack frontend on port 8090                |
 | `pnpm server:dev` | Start the development attachment service on port 8091 |
-| `pnpm start` | Serve the build and local attachments on port 8090 |
-| `pnpm build`  | Build into `dist/`           |
-| `pnpm type`   | Run TypeScript type checks   |
-| `pnpm lint`   | Lint with oxlint             |
-| `pnpm format` | Format with oxfmt            |
+| `pnpm start`      | Serve the build and local attachments on port 8090    |
+| `pnpm build`      | Build into `dist/`                                    |
+| `pnpm type`       | Run TypeScript type checks                            |
+| `pnpm lint`       | Lint with oxlint                                      |
+| `pnpm format`     | Format with oxfmt                                     |
 
 [rspack.config.ts](rspack.config.ts) uses `https://api.deepseek.com` by default. Use `createConfig({ apiOrigin, devServer })` to customize the API origin and development server proxy.
 

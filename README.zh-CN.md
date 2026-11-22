@@ -51,15 +51,15 @@ API Key 和设置保存在浏览器 localStorage。会话和附件引用保存�
 
 在两个终端分别运行 `pnpm server:dev` 和 `pnpm dev`，然后打开[开发页面](http://localhost:8090/)。Rspack 会将本地附件请求代理到 8091 端口。
 
-| 命令          | 用途                |
-| ------------- | ------------------- |
-| `pnpm dev`    | 启动 Rspack 前端开发服务器（8090） |
-| `pnpm server:dev` | 启动开发附件服务（8091） |
-| `pnpm start` | 托管 dist 并提供附件服务（8090） |
-| `pnpm build`  | 构建到 `dist/`      |
-| `pnpm type`   | TypeScript 类型检查 |
-| `pnpm lint`   | oxlint 检查         |
-| `pnpm format` | oxfmt 格式化        |
+| 命令              | 用途                               |
+| ----------------- | ---------------------------------- |
+| `pnpm dev`        | 启动 Rspack 前端开发服务器（8090） |
+| `pnpm server:dev` | 启动开发附件服务（8091）           |
+| `pnpm start`      | 托管 dist 并提供附件服务（8090）   |
+| `pnpm build`      | 构建到 `dist/`                     |
+| `pnpm type`       | TypeScript 类型检查                |
+| `pnpm lint`       | oxlint 检查                        |
+| `pnpm format`     | oxfmt 格式化                       |
 
 [rspack.config.ts](rspack.config.ts) 默认连接 `https://api.deepseek.com`。`createConfig({ apiOrigin, devServer })` 支持自定义 API 地址和开发服务器代理。
 

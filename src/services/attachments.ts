@@ -1,8 +1,11 @@
 import { create } from 'zustand'
 import type { LinkedMessage, TranslationMessage } from '../i18n/index.js'
+import { isUploadImageOversized } from '../utils/resizeUploadImage.js'
 import { TOP_UP_URL, uploadFile } from './api/client.js'
 import { classifyApiError, getUploadErrorInfo, isRetryableUploadError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
+import { loadFile } from './chat/db.js'
+import type { FileAttachment } from './chat/types.js'
 import { ACCEPT_FILE_EXTS } from './uploadExts.js'
 
 /** 允许上传的扩展名，按扩展名白名单过滤，清单见 uploadExts.ts */
@@ -221,6 +224,30 @@ export const cancelUpload = (id: string) => {
   setTask(id, null)
 }
 
+/** 检查旧图片的 file_id。超限返回 null 以触发补传，无法读取原件时保留原 ID。 */
+export const checkImageFileIds = async (files: FileAttachment[], signal: AbortSignal) => {
+  const checked = new Map<string, string | null>()
+  for (const file of files) {
+    if (!file.isImage || !file.serverId || file.imageSizeChecked || checked.has(file.id)) {
+      continue
+    }
+    signal.throwIfAborted()
+    const oversized = await loadFile(file.id)
+      .then((blob) => blob && isUploadImageOversized(blob))
+      .catch(() => undefined)
+    if (oversized === undefined) {
+      continue
+    }
+    signal.throwIfAborted()
+    const task = useUploads.getState().tasks[file.id]
+    if (oversized && task?.status === 'done' && task.serverId === file.serverId) {
+      cancelUpload(file.id)
+    }
+    checked.set(file.id, oversized ? null : file.serverId)
+  }
+  return checked
+}
+
 /** 各扩展名对应的 MIME：部分系统（如 Windows）给不出 file.type，按扩展名补齐 */
 const MIME_BY_EXT: Record<string, string> = {
   png: 'image/png',
@@ -230,10 +257,39 @@ const MIME_BY_EXT: Record<string, string> = {
   webp: 'image/webp',
 }
 
+const VIEW_MIME_BY_EXT: Record<string, string> = {
+  ...MIME_BY_EXT,
+  apng: 'image/png',
+  jpe: 'image/jpeg',
+  jfif: 'image/jpeg',
+  pjp: 'image/jpeg',
+  pjpeg: 'image/jpeg',
+  bmp: 'image/bmp',
+  dib: 'image/bmp',
+  ico: 'image/x-icon',
+  cur: 'image/x-icon',
+  avif: 'image/avif',
+  avifs: 'image/avif',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  svg: 'image/svg+xml',
+  pdf: 'application/pdf',
+}
+
+/** 展示附件时只按后缀确定类型。 */
+export const getFileViewType = (name: string) => {
+  const ext = getFileExt(name)
+  return Object.hasOwn(VIEW_MIME_BY_EXT, ext) ? VIEW_MIME_BY_EXT[ext] : ''
+}
+
 /** 取文件的 MIME：优先用浏览器给出的类型，缺失时按扩展名推断 */
 export const resolveMimeType = (file: File) => file.type || MIME_BY_EXT[getFileExt(file.name)] || ''
 
 export const isImage = (mimeType: string) => mimeType.startsWith('image/')
+
+export const isPreviewImage = (name: string) => isImage(getFileViewType(name))
 
 /** 文件扩展名（大写），用于卡片元信息 */
 export const getExtension = (name: string) => {

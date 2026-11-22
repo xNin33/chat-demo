@@ -1,49 +1,16 @@
 import clsx from 'clsx'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
-import { useUploads } from '../../services/attachments.js'
-import { loadFile } from '../../services/chat/db.js'
+import { isPreviewImage, useUploads } from '../../services/attachments.js'
 import type { FileAttachment } from '../../services/chat/types.js'
 import { IconPhotoErrorFill20, IconRefreshOutline16 } from '../base/icons.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { FileCard } from '../files/FileCard.js'
 import { ImagePreview } from '../files/ImagePreview.js'
-import { showToast } from '../base/toastState.js'
+import { useImagePreviewUrl } from '../files/useFileView.js'
 import { closeSearchPanel } from '../search/searchPanelState.js'
 import { openFilePreview } from '../files/sidePreviewState.js'
 import styles from './MessageFile.module.css'
-
-/** 从本地服务读取原件；undefined 表示加载中，null 表示原件缺失或读取失败。 */
-const useFileUrl = (id: string | null) => {
-  const [fileUrl, setFileUrl] = useState<{ id: string; url: string | null } | null>(null)
-  useEffect(() => {
-    if (id === null) {
-      return
-    }
-    let objectUrl: string | null = null
-    let cancelled = false
-    void loadFile(id)
-      .then((blob) => {
-        if (!cancelled) {
-          objectUrl = blob ? URL.createObjectURL(blob) : null
-          setFileUrl({ id, url: objectUrl })
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFileUrl({ id, url: null })
-          showToast({ key: 'localAttachmentUnavailable', type: 'error' })
-        }
-      })
-    return () => {
-      cancelled = true
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl)
-      }
-    }
-  }, [id])
-  return fileUrl?.id === id ? fileUrl.url : undefined
-}
 
 /** 历史或失效附件的补传状态：只在还没有 serverId 时显示 */
 const useUploadState = (file: FileAttachment) =>
@@ -70,7 +37,8 @@ export const MessageFile = ({
   onRetry: (() => void) | null
 }) => {
   const t = useTranslate()
-  const url = useFileUrl(file.isImage ? file.id : null)
+  const image = isPreviewImage(file.name)
+  const url = useImagePreviewUrl(file.id, file.name)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const upload = useUploadState(file)
@@ -81,7 +49,7 @@ export const MessageFile = ({
 
   const retry = retryable ? onRetry : null
 
-  if (file.isImage && url !== null) {
+  if (image && url !== null) {
     const preview = url ? (
       failedUrl === url ? (
         <span className={styles.failedIcon} role="img" aria-label={file.name}>
@@ -179,7 +147,7 @@ export const MessageFile = ({
       error={errorText}
       onRetry={retry ?? undefined}
       onOpen={
-        file.isImage
+        image
           ? undefined
           : () => {
               closeSearchPanel()
