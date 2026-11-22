@@ -1,9 +1,23 @@
 .frame {
+  --desktop-sider-width: 261px;
+  --sidebar-transition-duration: min(var(--ds-transition-duration-slow), 220ms);
+  --sidebar-transition-easing: cubic-bezier(0.35, 0, 0.45, 1);
   position: absolute;
   inset: 0;
   display: flex;
   overflow: hidden;
   background-color: var(--dsw-alias-bg-base);
+}
+
+.desktopSider {
+  width: var(--desktop-sider-width);
+  flex: none;
+  margin-inline-start: 0;
+  transition: margin-inline-start var(--sidebar-transition-duration) var(--sidebar-transition-easing);
+}
+
+.desktopSider[data-collapsed="true"] {
+  margin-inline-start: calc(-1 * var(--desktop-sider-width));
 }
 
 .main {
@@ -50,6 +64,25 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 14px;
   text-align: center;
+}
+
+.loadingState[aria-busy="true"]::before {
+  content: '';
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--dsw-alias-border-l2);
+  border-top-color: var(--dsw-alias-brand-text);
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loadingState[aria-busy="true"]::before {
+    animation: loading-spin 800ms linear infinite;
+  }
+}
+
+@keyframes loading-spin {
+  to { transform: rotate(1turn); }
 }
 
 @media not all and (min-width: 768px) {

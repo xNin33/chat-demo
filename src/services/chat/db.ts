@@ -1,8 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import { readDiskFile, removeDiskFile, writeDiskFile, type DiskFile } from '../localAttachments.js'
 import { toSessionSummary, type Session, type SessionSummary } from './types.js'
+import { useBrowserAttachments } from './storageMode.js'
 
 /** IndexedDB 存储结构版本；新增或调整存储、索引时递增。 */
-const DB_VERSION = 11
+const DB_VERSION = 13
+
+export type HistoryLocation = { directory: FileSystemDirectoryHandle; fileName: string }
 
 /** 文件原件按附件的本地 id 存储，所有引用同一 id 的消息共用一份；用于缩略图、打开查看，以及没有 serverId 时补传。 */
 export type StoredFile = {
@@ -14,6 +18,7 @@ export type StoredFile = {
 type StoredSessionSummary = SessionSummary & { fileIds: string[] }
 
 interface ChatDB extends DBSchema {
+  storagePreferences: { key: 'historyLocation'; value: HistoryLocation | null }
   /** 当前使用的会话，界面读写都在这里 */
   sessions: { key: string; value: Session }
   sessionSummaries: {
@@ -21,14 +26,14 @@ interface ChatDB extends DBSchema {
     value: StoredSessionSummary
     indexes: { fileIds: string }
   }
-  /** 当前使用的文件原件 */
-  files: { key: string; value: StoredFile }
+  /** 磁盘引用；旧版 Blob 在初始化时逐个迁移。 */
+  files: { key: string; value: StoredFile | DiskFile }
   /**
-   * 历史导入的暂存：导入过程中会话与原件只写入这两个存储，`sessions` / `files` 保持不变；
+   * 历史导入暂存会话与独立磁盘引用，`sessions` / `files` 保持不变；
    * 全部校验通过后在一个事务中替换正式数据并清空暂存，失败时只清空暂存。
    */
   sessionsStaging: { key: string; value: Session }
-  filesStaging: { key: string; value: StoredFile }
+  filesStaging: { key: string; value: StoredFile | DiskFile }
 }
 
 let dbPromise: Promise<IDBPDatabase<ChatDB>> | null = null
@@ -56,6 +61,9 @@ const abortTransaction = (tx: { abort(): void }) => {
 const getDB = () =>
   (dbPromise ??= openDB<ChatDB>('chat-demo', DB_VERSION, {
     upgrade(db, _oldVersion, _newVersion, tx) {
+      if (!db.objectStoreNames.contains('storagePreferences')) {
+        db.createObjectStore('storagePreferences')
+      }
       // 初始化当前格式需要的存储与索引，不迁移旧消息。
       for (const name of ['sessions', 'files', 'sessionsStaging', 'filesStaging'] as const) {
         if (!db.objectStoreNames.contains(name)) {
@@ -81,17 +89,41 @@ export const loadSessionSummaries = async (): Promise<SessionSummary[]> =>
 export const loadSession = async (id: string): Promise<Session | undefined> =>
   (await getDB()).get('sessions', id)
 
-export const saveSession = async (session: Session, files: StoredFile[] = []): Promise<void> => {
-  const summary = storedSummary(session)
-  const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')
+export const readHistoryLocation = async () => (await getDB()).get('storagePreferences', 'historyLocation')
+export const writeHistoryLocation = async (location: HistoryLocation | null) =>
+  (await getDB()).put('storagePreferences', location, 'historyLocation')
+
+const historyListeners = new Set<() => void>()
+export const onHistoryChanged = (listener: () => void) => {
+  historyListeners.add(listener)
+  return () => { historyListeners.delete(listener) }
+}
+const notifyHistoryChanged = () => historyListeners.forEach((listener) => listener())
+
+const pendingSaves = new Set<Promise<void>>()
+
+export const flushSaves = async (): Promise<void> => {
+  await Promise.all(pendingSaves)
+}
+
+export const saveSession = (session: Session, files: StoredFile[] = []): Promise<void> => {
+  const task = writeSession(session, files).finally(() => pendingSaves.delete(task))
+  pendingSaves.add(task)
+  return task
+}
+
+const writeSession = async (session: Session, files: StoredFile[]): Promise<void> => {
+  await saveFiles(files)
+  const tx = (await getDB()).transaction(['sessions', 'sessionSummaries'], 'readwrite')
   await Promise.all([
     (async () => {
       try {
-        for (const file of files) {
-          await tx.objectStore('files').put(file)
-        }
-        await tx.objectStore('sessions').put(session)
-        await tx.objectStore('sessionSummaries').put(summary)
+        const summaries = tx.objectStore('sessionSummaries')
+        const previous = await summaries.get(session.id)
+        // 流式回复可能在置顶前开始保存，沿用事务中已提交的置顶状态。
+        const current = previous ? { ...session, pinned: previous.pinned } : session
+        await tx.objectStore('sessions').put(current)
+        await summaries.put(storedSummary(current))
       } catch (error) {
         abortTransaction(tx)
         throw error
@@ -99,6 +131,7 @@ export const saveSession = async (session: Session, files: StoredFile[] = []): P
     })(),
     tx.done,
   ])
+  notifyHistoryChanged()
 }
 
 /** 未打开的会话也可重命名，只读取该会话，原子更新详情和列表。 */
@@ -121,10 +154,37 @@ export const renameSession = async (id: string, title: string): Promise<void> =>
     })(),
     tx.done,
   ])
+  notifyHistoryChanged()
+}
+
+export const setSessionsPinned = async (ids: ReadonlySet<string>, pinned: boolean): Promise<void> => {
+  const tx = (await getDB()).transaction(['sessions', 'sessionSummaries'], 'readwrite')
+  const sessions = tx.objectStore('sessions')
+  const summaries = tx.objectStore('sessionSummaries')
+  await Promise.all([
+    (async () => {
+      try {
+        for (const id of ids) {
+          const [session, summary] = await Promise.all([sessions.get(id), summaries.get(id)])
+          if (!session || !summary) {
+            throw new Error('Session could not be found')
+          }
+          await Promise.all([sessions.put({ ...session, pinned }), summaries.put({ ...summary, pinned })])
+        }
+      } catch (error) {
+        abortTransaction(tx)
+        throw error
+      }
+    })(),
+    tx.done,
+  ])
+  notifyHistoryChanged()
 }
 
 /** 删除会话，仅清理已无会话引用的本地原件；远端文件不删。 */
 export const deleteSession = async (sessionId: string): Promise<void> => {
+  await flushSaves()
+  const removed: DiskFile[] = []
   const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')
   await Promise.all([
     (async () => {
@@ -135,6 +195,10 @@ export const deleteSession = async (sessionId: string): Promise<void> => {
         await summaries.delete(sessionId)
         for (const id of summary?.fileIds ?? []) {
           if ((await summaries.index('fileIds').count(id)) === 0) {
+            const file = await tx.objectStore('files').get(id)
+            if (file && 'diskId' in file) {
+              removed.push(file)
+            }
             await tx.objectStore('files').delete(id)
           }
         }
@@ -145,26 +209,86 @@ export const deleteSession = async (sessionId: string): Promise<void> => {
     })(),
     tx.done,
   ])
+  await cleanFiles(removed)
+  notifyHistoryChanged()
 }
 
-const putFiles = async (store: 'files' | 'filesStaging', files: StoredFile[]) => {
-  const tx = (await getDB()).transaction(store, 'readwrite')
-  await Promise.all([...files.map((file) => tx.store.put(file)), tx.done])
+/** 只清理本浏览器移除的引用，不影响其他浏览器保存的原件。 */
+const cleanFiles = async (files: DiskFile[]) => {
+  for (const file of files) {
+    await removeDiskFile(file).catch(reportStorageError('delete disk attachment'))
+  }
+}
+
+let fileWrites: Promise<void> = Promise.resolve()
+
+const putFiles = (store: 'files' | 'filesStaging', files: StoredFile[]): Promise<void> => {
+  const task = fileWrites.then(() => writeFiles(store, files))
+  fileWrites = task.catch(() => {})
+  return task
+}
+
+const writeFiles = async (store: 'files' | 'filesStaging', files: StoredFile[]) => {
+  const db = await getDB()
+  for (const file of files) {
+    const previous = await db.get(store, file.id)
+    if (useBrowserAttachments) {
+      if (!previous) {
+        await db.put(store, file)
+      }
+      continue
+    }
+    // 会话保存重试时复用已经持久化的原件。
+    if (previous && 'diskId' in previous) {
+      continue
+    }
+    const reference = await writeDiskFile(file.id, file.blob)
+    try {
+      await db.put(store, reference)
+    } catch (error) {
+      await cleanFiles([reference])
+      throw error
+    }
+  }
 }
 
 export const saveFiles = (files: StoredFile[]): Promise<void> => putFiles('files', files)
 
-export const loadFile = async (id: string): Promise<Blob | undefined> =>
-  (await (await getDB()).get('files', id))?.blob
+export const loadFile = async (id: string): Promise<Blob | undefined> => {
+  await fileWrites
+  const file = await (await getDB()).get('files', id)
+  if (!file) {
+    return undefined
+  }
+  return 'diskId' in file ? readDiskFile(file) : file.blob
+}
+
+/** 写盘成功后才替换旧 Blob；失败时保留尚未迁移的原件。 */
+export const migrateAttachments = async (): Promise<void> => {
+  if (useBrowserAttachments) {
+    await clearStaging()
+    return
+  }
+  const db = await getDB()
+  for (const id of await db.getAllKeys('files')) {
+    const file = await db.get('files', id)
+    if (file && 'blob' in file) {
+      await saveFiles([file])
+    }
+  }
+  await clearStaging()
+}
 
 /** 清空导入暂存：开始导入前清除上次中断（如关闭页面）遗留的数据，导入失败后清除本次写入。 */
 export const clearStaging = async (): Promise<void> => {
+  const removed = await (await getDB()).getAll('filesStaging')
   const tx = (await getDB()).transaction(['sessionsStaging', 'filesStaging'], 'readwrite')
   await Promise.all([
     tx.objectStore('sessionsStaging').clear(),
     tx.objectStore('filesStaging').clear(),
     tx.done,
   ])
+  await cleanFiles(removed.filter((file): file is DiskFile => 'diskId' in file))
 }
 
 export const addStagingSession = async (session: Session): Promise<void> => {
@@ -204,7 +328,7 @@ export const updateStagingFileTypes = async (types: ReadonlyMap<string, string>)
 }
 
 /**
- * 导入完成后用暂存替换正式数据：同一事务中替换会话、摘要和原件，并清空暂存。
+ * 导入完成后在同一事务中替换会话、摘要和磁盘引用；提交后才清理旧原件。
  * 逐条游标复制，同一时间只读取一条记录；事务失败时整体回滚，正式数据不变。
  */
 export const commitStaging = async (): Promise<SessionSummary[]> => {
@@ -213,6 +337,7 @@ export const commitStaging = async (): Promise<SessionSummary[]> => {
     ['sessions', 'sessionSummaries', 'files', 'sessionsStaging', 'filesStaging'],
     'readwrite'
   )
+  const oldFiles = await tx.objectStore('files').getAll()
   const move = async (from: 'sessionsStaging' | 'filesStaging', to: 'sessions' | 'files') => {
     try {
       const target = tx.objectStore(to)
@@ -240,6 +365,8 @@ export const commitStaging = async (): Promise<SessionSummary[]> => {
     }
   }
   await Promise.all([move('sessionsStaging', 'sessions'), move('filesStaging', 'files'), tx.done])
+  await cleanFiles(oldFiles.filter((file): file is DiskFile => 'diskId' in file))
+  notifyHistoryChanged()
   // 直接返回本次提交的列表，调用方无需在替换成功后再发起可能失败的读取。
   return summaries
 }

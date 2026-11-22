@@ -7,12 +7,15 @@
   "type": "module",
   "scripts": {
     "dev": "rspack serve -c rspack.config.ts",
-    "build": "rm -rf dist && NODE_ENV=production rspack build -c rspack.config.ts",
+    "build": "rspack build --mode production -c rspack.config.ts",
+    "start": "node server.mjs",
+    "server:dev": "node --env-file=.env.development server.mjs",
     "type": "tsc -p tsconfig.json",
     "lint": "oxlint src rspack.config.ts",
     "format": "oxfmt --write ."
   },
   "dependencies": {
+    "@tanstack/react-virtual": "3.14.26",
     "@types/katex": "^0.16.5",
     "@types/mdast": "~4.0.3",
     "@types/prismjs": "^1.26.1",
@@ -27,6 +30,7 @@
     "mdast-util-gfm": "3.1.0",
     "mdast-util-math": "3.0.0",
     "mermaid": "11.10.1",
+    "micromark-extension-cjk-friendly": "2.0.2",
     "micromark-extension-gfm": "3.0.0",
     "micromark-extension-llm-math": "3.1.0",
     "prismjs": "1.30.0",

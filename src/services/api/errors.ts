@@ -43,11 +43,12 @@ export const classifyApiError = (error: unknown): ApiErrorCondition => {
   return classifyStatus(error.status)
 }
 
-/** 重试可能成功的情况：网络、限流、服务端繁忙；参数或鉴权类错误重试无用 */
-export const isRetryableApiError = (error: unknown): boolean => {
+/** 上传遇到暂时性错误或余额不足时保留手动重试入口。 */
+export const isRetryableUploadError = (error: unknown): boolean => {
   const condition = classifyApiError(error)
   return (
     !(error instanceof ApiError) ||
+    condition === 'insufficientBalance' ||
     condition === 'network' ||
     condition === 'rateLimited' ||
     condition === 'serverBusy'

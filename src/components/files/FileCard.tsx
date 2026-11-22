@@ -58,13 +58,24 @@ export const FileCard = ({
             : description
           : name
       }
-      onClick={onClick}
     >
       <div className={clsx(styles.icon, status === 'error' && onRetry && styles.retry)}>{icon}</div>
       <div className={styles.content}>
         <div className={styles.caption}>{name}</div>
         <div className={styles.subCaption}>{description}</div>
       </div>
+      {onClick && (
+        <button
+          type="button"
+          className={styles.open}
+          aria-label={
+            status === 'error'
+              ? t('uploadRetry', { message: description })
+              : t('previewFile', { name })
+          }
+          onClick={onClick}
+        />
+      )}
       {onRemove ? (
         <button
           type="button"

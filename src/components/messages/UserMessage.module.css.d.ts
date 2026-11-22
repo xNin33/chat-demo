@@ -4,6 +4,10 @@ declare const styles: {
   readonly "actions": string;
   readonly "files": string;
   readonly "filesWithDocuments": string;
+  readonly "retainedFile": string;
+  readonly "removeAttachment": string;
+  readonly "editorBranch": string;
+  readonly "editorDrop": string;
   readonly "bubble": string;
   readonly "bottom": string;
   readonly "alwaysShow": string;

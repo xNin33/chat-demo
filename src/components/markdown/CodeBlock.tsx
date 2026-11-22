@@ -6,21 +6,59 @@ import {
   isHighlightLoaded,
   loadHighlight,
 } from '../../services/markdown/highlight.js'
-import { IconCheckOutline16, IconCopyOutline16 } from '../base/icons.js'
+import {
+  IconCheckOutline16,
+  IconCopyOutline16,
+  IconDownloadOutline16,
+  IconPlayMediaOutline16,
+} from '../base/icons.js'
 import { showToast } from '../base/toastState.js'
 import { copyText } from '../../utils/clipboard.js'
+import { downloadBlob } from '../../utils/download.js'
+import { closeSearchPanel } from '../search/searchPanelState.js'
 import { MermaidDiagram } from './MermaidDiagram.js'
+import { openHtmlPreview } from '../files/sidePreviewState.js'
 import styles from './CodeBlock.module.css'
 
-/** 代码块标题栏：左侧语言名，右侧复制 */
+const codeExtensions = new Map([
+  ['bash', 'sh'],
+  ['c', 'c'],
+  ['cpp', 'cpp'],
+  ['csharp', 'cs'],
+  ['css', 'css'],
+  ['go', 'go'],
+  ['java', 'java'],
+  ['javascript', 'js'],
+  ['json', 'json'],
+  ['jsx', 'jsx'],
+  ['markdown', 'md'],
+  ['mermaid', 'mmd'],
+  ['powershell', 'ps1'],
+  ['python', 'py'],
+  ['ruby', 'rb'],
+  ['rust', 'rs'],
+  ['sql', 'sql'],
+  ['tsx', 'tsx'],
+  ['typescript', 'ts'],
+  ['yaml', 'yaml'],
+  ['xml', 'xml'],
+  ['svg', 'svg'],
+])
+
 const CodeInfoRow = ({
   code,
   infostring,
+  fileName,
+  canRun,
+  loading,
   showDiagram,
   onToggleDiagram,
 }: {
   code: string
   infostring: string
+  fileName: string
+  canRun: boolean
+  loading: boolean
   showDiagram: boolean
   onToggleDiagram?: () => void
 }) => {
@@ -50,21 +88,49 @@ const CodeInfoRow = ({
       ) : (
         <span className={styles.name}>{infostring}</span>
       )}
-      <button
-        type="button"
-        className={styles.button}
-        onClick={async () => {
-          if (!(await copyText(code))) {
-            showToast({ key: 'copyFailed' })
-            return
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className={styles.button}
+          onClick={async () => {
+            if (!(await copyText(code))) {
+              showToast({ key: 'copyFailed' })
+              return
+            }
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+          }}
+        >
+          {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
+          <span>{t(copied ? 'copied' : 'copy')}</span>
+        </button>
+        <button
+          type="button"
+          className={styles.button}
+          aria-label={t('downloadCode')}
+          onClick={() =>
+            downloadBlob(new Blob([code], { type: 'text/plain;charset=utf-8' }), fileName)
           }
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1500)
-        }}
-      >
-        {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
-        <span>{t(copied ? 'copied' : 'copy')}</span>
-      </button>
+        >
+          <IconDownloadOutline16 />
+          <span>{t('downloadCode')}</span>
+        </button>
+        {canRun && (
+          <button
+            type="button"
+            className={styles.button}
+            aria-label={t('runCode')}
+            disabled={loading}
+            onClick={() => {
+              closeSearchPanel()
+              openHtmlPreview(code)
+            }}
+          >
+            <IconPlayMediaOutline16 />
+            <span>{t('runCode')}</span>
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -79,11 +145,14 @@ export const CodeBlock = memo(function CodeBlock({
   infostring: string
   loading?: boolean
 }) {
-  const isMermaid = infostring.toLowerCase() === 'mermaid'
+  const language = infostring.trim().toLowerCase()
+  const isMermaid = language === 'mermaid'
+  const isHtml = ['html', 'htm', 'html5'].includes(language)
   const [showDiagram, setShowDiagram] = useState(true)
   // 语言包注册在全局 Prism 上，每次渲染直接判断；加载完成后触发一次重渲染
   const rerender = useReducer((n: number) => n + 1, 0)[1]
-  const lang = getHighlightLang(infostring)
+  const lang = getHighlightLang(isHtml ? 'html' : language)
+  const extension = codeExtensions.get(language) ?? codeExtensions.get(lang ?? '') ?? 'txt'
   const loaded = lang !== null && isHighlightLoaded(lang)
   useEffect(() => {
     if (lang === null || loaded) {
@@ -109,6 +178,9 @@ export const CodeBlock = memo(function CodeBlock({
         <CodeInfoRow
           code={code}
           infostring={infostring}
+          fileName={isHtml ? 'index.html' : `code.${extension}`}
+          canRun={isHtml}
+          loading={loading}
           showDiagram={showDiagram}
           onToggleDiagram={isMermaid ? () => setShowDiagram((show) => !show) : undefined}
         />

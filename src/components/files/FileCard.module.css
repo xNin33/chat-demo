@@ -13,9 +13,26 @@
   cursor: default;
   transition: background-color 0.2s ease-in-out;
 
-  &:hover .remove {
+  &:hover .remove,
+  &:focus-within .remove {
     opacity: 1;
   }
+}
+
+.open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: inherit;
+}
+
+.open:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
 }
 
 .clickable {
@@ -99,6 +116,7 @@
 
 .remove {
   position: absolute;
+  z-index: 1;
   top: 4px;
   right: 4px;
   display: flex;

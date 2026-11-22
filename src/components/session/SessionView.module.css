@@ -16,13 +16,34 @@
 }
 
 .title {
+  field-sizing: content;
+  min-width: 4em;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
   max-width: 480px;
+  transition:
+    margin-left var(--sidebar-transition-duration) var(--sidebar-transition-easing),
+    border-color var(--ds-transition-duration) var(--ds-ease-in-out),
+    background-color var(--ds-transition-duration) var(--ds-ease-in-out),
+    box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
   padding: 8px 12px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font: var(--dsw-font-s-strong-14);
+  font: 400 14px/22px var(--dsw-font-family);
   color: var(--dsw-alias-label-primary);
+}
+
+.title:is(:hover, :focus) {
+  border-color: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-button-elevated-fill);
+  box-shadow: 0 3px 8px rgb(0 0 0 / 7%);
+}
+
+.title:focus {
+  border-color: var(--dsw-alias-brand-primary);
+  outline: none;
 }
 
 .withCollapsedSider {
@@ -30,8 +51,7 @@
 }
 
 .inputContainer {
-  position: sticky;
-  bottom: 0;
+  position: relative;
   z-index: 10;
   display: flex;
   flex-direction: column;

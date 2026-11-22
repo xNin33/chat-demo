@@ -7,20 +7,34 @@ import type { FileAttachment } from '../../services/chat/types.js'
 import { IconPhotoErrorFill20, IconRefreshOutline16 } from '../base/icons.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { FileCard } from '../files/FileCard.js'
+import { ImagePreview } from '../files/ImagePreview.js'
+import { showToast } from '../base/toastState.js'
+import { closeSearchPanel } from '../search/searchPanelState.js'
+import { openFilePreview } from '../files/sidePreviewState.js'
 import styles from './MessageFile.module.css'
 
-/** 原件从 IndexedDB 读出并生成本地地址；undefined 表示加载中，null 表示原件缺失。 */
-const useFileUrl = (id: string) => {
+/** 从本地服务读取原件；undefined 表示加载中，null 表示原件缺失或读取失败。 */
+const useFileUrl = (id: string | null) => {
   const [fileUrl, setFileUrl] = useState<{ id: string; url: string | null } | null>(null)
   useEffect(() => {
+    if (id === null) {
+      return
+    }
     let objectUrl: string | null = null
     let cancelled = false
-    loadFile(id).then((blob) => {
-      if (!cancelled) {
-        objectUrl = blob ? URL.createObjectURL(blob) : null
-        setFileUrl({ id, url: objectUrl })
-      }
-    })
+    void loadFile(id)
+      .then((blob) => {
+        if (!cancelled) {
+          objectUrl = blob ? URL.createObjectURL(blob) : null
+          setFileUrl({ id, url: objectUrl })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFileUrl({ id, url: null })
+          showToast({ key: 'localAttachmentUnavailable', type: 'error' })
+        }
+      })
     return () => {
       cancelled = true
       if (objectUrl) {
@@ -56,8 +70,9 @@ export const MessageFile = ({
   onRetry: (() => void) | null
 }) => {
   const t = useTranslate()
-  const url = useFileUrl(file.id)
+  const url = useFileUrl(file.isImage ? file.id : null)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const upload = useUploadState(file)
   const uploading = upload?.status === 'uploading'
   const failed = upload?.status === 'error'
@@ -77,7 +92,7 @@ export const MessageFile = ({
       )
     ) : null
 
-    // 上传中：本地原件已在 IndexedDB，先垫在蒙层下显示，避免只有一块灰色占位
+    // 上传中：先显示本地原件预览，避免只有一块灰色占位
     if (uploading) {
       return (
         <div className={clsx(styles.image, styles.imageThumb)} title={file.name}>
@@ -134,17 +149,22 @@ export const MessageFile = ({
       )
     }
 
-    // 正常态：链接到原件
     return url ? (
-      <a
-        className={clsx(styles.image, styles.imageThumb)}
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        title={file.name}
-      >
-        {preview}
-      </a>
+      <>
+        <button
+          type="button"
+          className={clsx(styles.image, styles.imageThumb)}
+          aria-label={t('previewImage', { name: file.name })}
+          title={file.name}
+          disabled={failedUrl === url}
+          onClick={() => setPreviewOpen(true)}
+        >
+          {preview}
+        </button>
+        {previewOpen && (
+          <ImagePreview src={url} name={file.name} onClose={() => setPreviewOpen(false)} />
+        )}
+      </>
     ) : (
       // 原件还没加载出来（极短暂）
       <div className={styles.image} />
@@ -158,7 +178,14 @@ export const MessageFile = ({
       status={uploading ? 'uploading' : failed ? 'error' : 'done'}
       error={errorText}
       onRetry={retry ?? undefined}
-      onOpen={url && !upload ? () => window.open(url, '_blank', 'noreferrer') : undefined}
+      onOpen={
+        file.isImage
+          ? undefined
+          : () => {
+              closeSearchPanel()
+              openFilePreview(file)
+            }
+      }
     />
   )
 }

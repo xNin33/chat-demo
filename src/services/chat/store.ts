@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
-import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
+import { extractFileIds, getFileErrorCode, isRetryableUploadError } from '../api/errors.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { useSettings } from '../settings.js'
 import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } from './branches.js'
@@ -103,14 +103,26 @@ const getStreamController = (id: string) => {
 }
 
 const sameSummary = (a: SessionSummary, b: SessionSummary) =>
-  a.title === b.title && a.createdAt === b.createdAt && a.updatedAt === b.updatedAt
+  a.title === b.title && a.createdAt === b.createdAt && a.updatedAt === b.updatedAt &&
+  a.pinned === b.pinned
 
 const sessionAccess = new Map<string, number>()
 const unsavedSessions = new Set<string>()
 /** 保存失败时保留原件，重试成功后才释放。 */
 const pendingFiles = new Map<string, db.StoredFile[]>()
+const keepDraftFiles = (sessionId: string, files: (FileAttachment & { blob: Blob })[]) => {
+  if (files.length > 0) {
+    pendingFiles.set(sessionId, [
+      ...(pendingFiles.get(sessionId) ?? []),
+      ...files.map(({ id, blob }) => ({ id, blob })),
+    ])
+  }
+  return files.map(({ id, serverId, name, size, isImage, mimeType }) => ({
+    id, serverId, name, size, isImage, mimeType,
+  }))
+}
 const deletingSessions = new Set<string>()
-const deletionTasks = new Set<Promise<boolean>>()
+const historyEdits = new Set<Promise<boolean>>()
 const streamFlushes = new Map<string, () => void>()
 let accessSequence = 0
 let historyEpoch = 0
@@ -299,6 +311,7 @@ export const initChat = (): Promise<void> => {
   set({ initError: false })
   initTask = (async () => {
     try {
+      await db.migrateAttachments()
       const summaries = await db.loadSessionSummaries()
       if (epoch === historyEpoch) {
         set({ ready: true, sessions: sortSessions(summaries) })
@@ -398,12 +411,13 @@ export const replaceHistory = async (write: () => Promise<void>): Promise<number
     for (const controller of Object.values(get().streaming)) {
       controller.abort()
     }
-    // 已开始的单条删除先同步到内存，避免本次替换失败后列表残留已被删除的记录。
-    await Promise.all(deletionTasks)
+    // 已开始的修改先同步到内存，避免替换失败后列表与磁盘不一致。
+    await Promise.all(historyEdits)
     historyEpoch += 1
     initTask = undefined
     sessionLoads.clear()
     await waitForIdle()
+    await db.flushSaves()
     await db.clearStaging()
     let summaries: SessionSummary[]
     try {
@@ -482,8 +496,39 @@ export const renameSession = (id: string, title: string) => {
  * 同一服务端文件可能被多个会话引用，不维护引用计数。
  */
 export const removeSession = (id: string): Promise<boolean> => {
-  const task = removeSessionData(id).finally(() => deletionTasks.delete(task))
-  deletionTasks.add(task)
+  const task = removeSessionData(id).finally(() => historyEdits.delete(task))
+  historyEdits.add(task)
+  return task
+}
+
+export const setSessionsPinned = (ids: ReadonlySet<string>, pinned: boolean): Promise<boolean> => {
+  const task = (async () => {
+    if (get().importingHistory || [...ids].some((id) => deletingSessions.has(id))) {
+      return false
+    }
+    try {
+      await db.flushSaves()
+      await db.setSessionsPinned(ids, pinned)
+      set((state) => ({
+        sessions: state.sessions.map((session) => ids.has(session.id) ? { ...session, pinned } : session),
+        sessionCache: Object.fromEntries(Object.entries(state.sessionCache).map(([id, session]) =>
+          [id, ids.has(id) ? { ...session, pinned } : session]
+        )),
+      }))
+      if (!get().importingHistory) {
+        for (const id of ids) {
+          if (unsavedSessions.has(id)) {
+            persist(id)
+          }
+        }
+      }
+      return true
+    } catch (error) {
+      db.reportStorageError('pin sessions')(error)
+      return false
+    }
+  })().finally(() => historyEdits.delete(task))
+  historyEdits.add(task)
   return task
 }
 
@@ -588,14 +633,7 @@ export const sendMessage = (targetSessionId: string | null) => {
     id: createId(),
     role: 'user',
     content: text,
-    files: files.map(({ id, serverId, name, size, isImage, mimeType }) => ({
-      id,
-      serverId,
-      name,
-      size,
-      isImage,
-      mimeType,
-    })),
+    files: keepDraftFiles(sessionId, files),
     createdAt: now,
   }
   const reply = createReply()
@@ -603,12 +641,6 @@ export const sendMessage = (targetSessionId: string | null) => {
     ...appendBranch(session, history.at(-1)?.id ?? null, [question, reply]),
     updatedAt: now,
   }))
-  if (files.length > 0) {
-    pendingFiles.set(sessionId, [
-      ...(pendingFiles.get(sessionId) ?? []),
-      ...files.map(({ id, blob }) => ({ id, blob })),
-    ])
-  }
   persist(sessionId)
   clearSentDraft(targetSessionId)
   void streamReply(sessionId, reply, { history, question })
@@ -641,8 +673,14 @@ export const regenerateReply = (sessionId: string, messageId?: string) => {
   void streamReply(sessionId, reply, { history, question })
 }
 
-/** 编辑提问后新增同父版本，保留原文件；旧问题的所有回答与后续对话仍可切回。 */
-export const editMessage = (sessionId: string, messageId: string, content: string): boolean => {
+/** 编辑提问后新增同父版本；旧问题及其附件仍保留在原分支。 */
+export const editMessage = (
+  sessionId: string,
+  messageId: string,
+  content: string,
+  removedIds: ReadonlySet<string>,
+  attachmentDraft: symbol
+): boolean => {
   if (get().importingHistory || deletingSessions.has(sessionId)) {
     return false
   }
@@ -653,15 +691,23 @@ export const editMessage = (sessionId: string, messageId: string, content: strin
   const path = getVisibleMessages(session)
   const index = path.findIndex((message) => message.id === messageId)
   const previous = path[index]
-  const text = content.trim()
-  if (previous?.role !== 'user' || (!text && previous.files.length === 0)) {
+  if (previous?.role !== 'user') {
+    return false
+  }
+  const retained = previous.files.filter((file) => !removedIds.has(file.id))
+  const prepared = prepareDraftMessage(
+    { ...getDraft(attachmentDraft), text: content },
+    useUploads.getState().tasks,
+    retained.length
+  )
+  if (!prepared) {
     return false
   }
   const question: UserMessage = {
     id: createId(),
     role: 'user',
-    content: text,
-    files: previous.files,
+    content: prepared.text,
+    files: [...retained, ...keepDraftFiles(sessionId, prepared.files)],
     createdAt: Date.now(),
   }
   const reply = createReply()
@@ -670,6 +716,7 @@ export const editMessage = (sessionId: string, messageId: string, content: strin
     updatedAt: Date.now(),
   }))
   persist(sessionId)
+  clearSentDraft(attachmentDraft)
   void streamReply(sessionId, reply, { history: path.slice(0, index), question })
   return true
 }
@@ -1043,7 +1090,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
             kind: 'upload',
             message: '',
             localMessage: describeUploadError(error),
-            retryable: isRetryableApiError(error),
+            retryable: isRetryableUploadError(error),
           })
           break
         }

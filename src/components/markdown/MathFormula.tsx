@@ -52,9 +52,9 @@ export const MathBlock = memo(function MathBlock({ value }: { value: string }) {
     return <p className="ds-markdown-paragraph">{html}</p>
   }
   return (
-    <span className="katex-display ds-markdown-math">
+    <div className="katex-display ds-markdown-math">
       <span className="katex" dangerouslySetInnerHTML={{ __html: html }}></span>
-    </span>
+    </div>
   )
 })
 
@@ -63,5 +63,9 @@ export const InlineMath = memo(function InlineMath({ value }: { value: string })
   if (renderMode === 'fallback') {
     return html
   }
-  return <span className="katex" dangerouslySetInnerHTML={{ __html: html }}></span>
+  return (
+    <span className="ds-markdown-inline-math">
+      <span className="katex" dangerouslySetInnerHTML={{ __html: html }} />
+    </span>
+  )
 })

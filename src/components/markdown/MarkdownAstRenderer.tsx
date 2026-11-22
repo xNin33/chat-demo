@@ -1,4 +1,4 @@
-import { createElement, memo, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react'
+import { createElement, memo, useMemo, type ReactNode } from 'react'
 import clsx from 'clsx'
 import type {
   BlockContent,
@@ -23,7 +23,7 @@ const Html = memo(function Html({ value }: { value: string }) {
 const List = memo(function List({ node, loading }: { node: ListNode; loading: boolean }) {
   const ListTag = node.ordered ? 'ol' : 'ul'
   return (
-    <ListTag start={node.ordered ? node.start || undefined : undefined}>
+    <ListTag start={node.ordered ? node.start ?? undefined : undefined}>
       {node.children.map((child, index) => {
         // GFM: task item 的 checked 为 boolean；普通 listItem 为 null
         const checked = child.checked
@@ -52,7 +52,7 @@ const Table = memo(function Table({ node }: { node: TableNode }) {
             <tr>
               {node.children[0].children.map((cell, cellIndex) => {
                 return (
-                  <th key={cellIndex}>
+                  <th key={cellIndex} style={{ textAlign: node.align?.[cellIndex] ?? undefined }}>
                     <MarkdownPhrasingContent nodes={cell.children} />
                   </th>
                 )
@@ -68,7 +68,7 @@ const Table = memo(function Table({ node }: { node: TableNode }) {
                 <tr key={rowIndex}>
                   {row.children.map((cell, cellIndex) => {
                     return (
-                      <td key={cellIndex}>
+                      <td key={cellIndex} style={{ textAlign: node.align?.[cellIndex] ?? undefined }}>
                         <MarkdownPhrasingContent nodes={cell.children} />
                       </td>
                     )
@@ -214,24 +214,13 @@ const MarkdownBlockContentOrDefinitionContent = memo(
 
 export const MarkdownAstRenderer = memo(function MarkdownAstRenderer({
   ast,
-  onUpdate,
   className,
   loading = false,
 }: {
   ast: Root
   className?: string
   loading?: boolean
-  /**
-   * layoutEffect 之后触发 -> 进行页面滚动
-   */
-  onUpdate: () => void
 }) {
-  const onUpdateRef = useRef<() => void>(() => 0)
-  onUpdateRef.current = onUpdate
-  useLayoutEffect(() => {
-    onUpdateRef.current()
-  }, [ast.children])
-
   return useMemo(
     () => (
       <div className={clsx('ds-markdown', className)}>

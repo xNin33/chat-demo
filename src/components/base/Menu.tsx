@@ -39,6 +39,7 @@ export const Menu = ({
             <div
               ref={floatingRef}
               className={styles.menu}
+              data-motion="enter"
               style={position ?? undefined}
               role="menu"
             >

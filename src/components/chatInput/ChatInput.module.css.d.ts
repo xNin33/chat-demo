@@ -4,6 +4,8 @@ declare const styles: {
   readonly "home": string;
   readonly "attachments": string;
   readonly "attachment": string;
+  readonly "attachmentPreview": string;
+  readonly "attachmentRetry": string;
   readonly "remove": string;
   readonly "uploading": string;
   readonly "spin": string;

@@ -39,6 +39,22 @@ export const exportHistory = (): Promise<{ name: string; blob: Blob }> =>
     return { name: backupFileName(now), blob }
   })
 
+/** 目录自动保存以 IndexedDB 中已提交的记录为准，包括其他标签页写入的记录。 */
+export const exportSavedHistory = (): Promise<Blob> =>
+  enqueueBackup(async () => {
+    await db.flushSaves()
+    const { exportArchive } = await import('./history/exportArchive.js')
+    async function* readSessions(): AsyncGenerator<Session> {
+      for (const summary of await db.loadSessionSummaries()) {
+        const session = await db.loadSession(summary.id)
+        if (session) {
+          yield session
+        }
+      }
+    }
+    return exportArchive(readSessions())
+  })
+
 /**
  * 确认覆盖后调用：先检查 ZIP 格式与版本，校验失败时保留正在生成的回答；
  * 通过后从 ZIP 流式写入暂存，成功才替换原有会话与图片原件。返回导入的会话数。

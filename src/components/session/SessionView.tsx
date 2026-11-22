@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import type { Session } from '../../services/chat/types.js'
+import { renameSession } from '../../services/chat/store.js'
 import { ChatInput } from '../chatInput/ChatInput.js'
 import { MessageList } from '../messages/MessageList.js'
 import { MobileHeader } from './MobileHeader.js'
@@ -26,12 +27,34 @@ export const SessionView = ({
         <MobileHeader title={title} />
       ) : (
         <div className={styles.header}>
-          <div className={clsx(styles.title, siderCollapsed && styles.withCollapsedSider)}>
-            {title}
-          </div>
+          <input
+            key={session.id + ':' + title}
+            className={clsx(styles.title, siderCollapsed && styles.withCollapsedSider)}
+            aria-label={t('sessionItemMenuRenameOption')}
+            defaultValue={title}
+            onBlur={(event) => {
+              const value = event.currentTarget.value.trim()
+              event.currentTarget.value = value || title
+              if (value && value !== title) {
+                renameSession(session.id, value)
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) {
+                return
+              }
+              if (event.key === 'Escape') {
+                event.currentTarget.value = title
+              }
+              if (event.key === 'Enter' || event.key === 'Escape') {
+                event.currentTarget.blur()
+              }
+            }}
+          />
         </div>
       )}
       <MessageList
+        key={session.id}
         session={session}
         streaming={streaming}
         footer={

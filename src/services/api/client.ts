@@ -11,6 +11,7 @@ import type {
 
 /** 构建期 API 地址，默认 https://api.deepseek.com；本地开发支持开发服务器代理 */
 export const API_ORIGIN = __API_ORIGIN__
+export const TOP_UP_URL = 'https://platform.deepseek.com/top_up'
 /** Anthropic 兼容接口的前缀 */
 const ANTHROPIC_BASE_URL = `${API_ORIGIN}/anthropic/v1`
 /** 引用 Files API 上传的图片、调用 Anthropic 兼容 Files API 时必须携带 */

@@ -220,13 +220,34 @@
   }
 }
 
-.ds-markdown-math.katex-display {
-  display: block;
-  text-align: center;
+.ds-markdown-math.katex-display,
+.ds-markdown-inline-math {
+  position: relative;
+  box-sizing: border-box;
+  max-inline-size: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  max-width: 100%;
+  overscroll-behavior-x: contain;
+}
+
+.ds-markdown-math.katex-display {
+  display: block;
   padding: 4px;
+}
+
+.ds-markdown-math > .katex {
+  width: max-content;
+  min-width: 100%;
+}
+
+.ds-markdown-inline-math {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.ds-markdown-inline-math > .katex {
+  display: block;
+  width: max-content;
 }
 
 .ds-markdown > * .ds-markdown-math {

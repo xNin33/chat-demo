@@ -14,7 +14,7 @@ export const SearchPanel = () => {
     return null
   }
   return (
-    <aside className={styles.panel}>
+    <aside className={styles.panel} data-motion="fade">
       <div className={styles.header}>
         <div role="heading" className={styles.title}>
           {t('searchResult')}

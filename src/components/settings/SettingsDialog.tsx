@@ -28,6 +28,9 @@ import {
   type ThemePreference,
 } from '../../services/settings.js'
 import { useTranslate, type TranslationKey, type TranslationMessage } from '../../i18n/index.js'
+import { openHistoryLocation, useHistoryLocation } from '../../services/chat/historyLocation.js'
+import { canChooseHistoryDirectory } from '../../services/chat/storageMode.js'
+import { downloadBlob } from '../../utils/download.js'
 import { Button } from '../base/Button.js'
 import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
@@ -104,6 +107,7 @@ const SettingsContent = () => {
           ) : (
             <>
               <ApiKeyField editor={apiKeyEditor} />
+              {canChooseHistoryDirectory && <HistoryLocationSetting disabled={historyBusy} />}
               <ImportHistory historyImport={historyImport} disabled={historyBusy} />
               <ExportHistory disabled={historyBusy} />
               <SettingCell
@@ -436,6 +440,24 @@ const SettingCell = ({
   )
 }
 
+const HistoryLocationSetting = ({ disabled }: { disabled: boolean }) => {
+  const t = useTranslate()
+  const { location, busy } = useHistoryLocation()
+  return (
+    <SettingCell
+      label={t('historyDirectoryTitle')}
+      description={location ? `${location.directory.name}/${location.fileName}` : t('historyUseBrowser')}
+      status={null}
+      action={
+        <Button variant="outlined" size="m" className={styles.cellButton}
+          disabled={disabled || busy} onClick={openHistoryLocation}>
+          {t('historyChooseDirectory')}
+        </Button>
+      }
+    />
+  )
+}
+
 /** 选文件后先提示覆盖；确认后才检查文件并执行导入，任何错误都提示导入失败。 */
 const useHistoryImport = () => {
   const [file, setFile] = useState<File | null>(null)
@@ -524,12 +546,7 @@ const ExportHistory = ({ disabled }: { disabled: boolean }) => {
     setStatus(null)
     try {
       const { name, blob } = await exportHistory()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = name
-      link.click()
-      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      downloadBlob(blob, name)
     } catch (error) {
       setStatus(errorStatus('historyExportFailed', error))
     } finally {

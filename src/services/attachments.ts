@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { LinkedMessage, TranslationMessage } from '../i18n/index.js'
-import { uploadFile } from './api/client.js'
-import { classifyApiError, getUploadErrorInfo, isRetryableApiError } from './api/errors.js'
+import { TOP_UP_URL, uploadFile } from './api/client.js'
+import { classifyApiError, getUploadErrorInfo, isRetryableUploadError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
 import { ACCEPT_FILE_EXTS } from './uploadExts.js'
 
@@ -62,7 +62,11 @@ export const validateFiles = (files: File[], currentCount: number): TranslationM
  * 服务端原文多为英文且较长，不直接展示。
  */
 export const describeUploadError = (error: unknown): TranslationMessage => {
-  if (classifyApiError(error) === 'serverBusy') {
+  const condition = classifyApiError(error)
+  if (condition === 'insufficientBalance') {
+    return { key: 'insufficientBalance' }
+  }
+  if (condition === 'serverBusy') {
     return { key: 'uploadServerBusy' }
   }
   if (getUploadErrorInfo(error)?.code === 'parseFailed') {
@@ -74,7 +78,7 @@ export const describeUploadError = (error: unknown): TranslationMessage => {
 type NoticeListener = (notice: LinkedMessage) => void
 const noticeListeners = new Set<NoticeListener>()
 
-/** 订阅需要额外提示的上传失败（配额达到上限），由界面层转成 toast */
+/** 订阅需要额外提示的上传失败，由界面层转成 toast */
 export const onUploadNotice = (listener: NoticeListener) => {
   noticeListeners.add(listener)
   return () => {
@@ -85,8 +89,15 @@ export const onUploadNotice = (listener: NoticeListener) => {
 /** 删除已上传文件的接口文档 */
 const DELETE_FILE_DOCS_URL = 'https://api-docs.deepseek.com/api/delete-file'
 
-/** 文件数或存储空间达到上限：附件上只放得下「上传失败」，原因另用 toast 说明并引导删除旧文件 */
-export const describeUploadQuota = (error: unknown): LinkedMessage | undefined => {
+/** 余额与配额的详细原因通过 toast 显示，并提供对应的处理入口。 */
+const describeUploadNotice = (error: unknown): LinkedMessage | undefined => {
+  if (classifyApiError(error) === 'insufficientBalance') {
+    return {
+      key: 'uploadInsufficientBalance',
+      type: 'error',
+      link: { key: 'topUp', href: TOP_UP_URL },
+    }
+  }
   const info = getUploadErrorInfo(error)
   const link = { key: 'uploadDeleteFiles', href: DELETE_FILE_DOCS_URL } as const
   if (info?.code === 'fileCountLimit') {
@@ -189,9 +200,9 @@ export const uploadAttachment = (
         setTask(id, {
           status: 'error',
           error: describeUploadError(error),
-          retryable: isRetryableApiError(error),
+          retryable: isRetryableUploadError(error),
         })
-        const notice = describeUploadQuota(error)
+        const notice = describeUploadNotice(error)
         if (notice) {
           for (const listener of noticeListeners) {
             listener(notice)

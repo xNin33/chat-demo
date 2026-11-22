@@ -1,15 +1,20 @@
 import { useEffect } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import { useSettings } from '../services/settings.js'
+import { bindHistoryLocation, initHistoryLocation, retryHistoryLocationSave, useHistoryLocation } from '../services/chat/historyLocation.js'
+import { HistoryLocationDialog } from '../components/settings/HistoryLocationDialog.js'
 import { useIsMobile, useMobileViewport, usePreventPageScroll } from './viewport.js'
 import {
   bindChatPersistence,
   initChat,
+  newChat,
   retrySaveSessions,
   selectSession,
   useChatStore,
 } from '../services/chat/store.js'
 import { SearchPanel } from '../components/search/SearchPanel.js'
+import { SidePreview } from '../components/files/SidePreview.js'
+import { closeSidePreview } from '../components/files/sidePreviewState.js'
 import { closeSearchPanel } from '../components/search/searchPanelState.js'
 import { SessionView } from '../components/session/SessionView.js'
 import { MobileHeader } from '../components/session/MobileHeader.js'
@@ -22,17 +27,21 @@ import { onUploadNotice } from '../services/attachments.js'
 import { Button } from '../components/base/Button.js'
 import { stopReadAloud } from '../services/speech/readAloud.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
+import { HistorySearch } from '../components/sider/HistorySearch.js'
+import { useHistorySearch } from '../components/sider/historySearchState.js'
 import { closeMobileSider } from '../components/sider/mobileSiderState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
 import styles from './App.module.css'
 
 export const App = () => {
   const t = useTranslate()
+  const searching = useHistorySearch(state => state.open)
   const isMobile = useIsMobile()
   const locale = useSettings((state) => state.locale)
   // 移动端侧边栏以独立抽屉管理开合状态
   const siderCollapsed = useSettings((state) => state.siderCollapsed) && !isMobile
   const ready = useChatStore((state) => state.ready)
+  const directorySaveError = useHistoryLocation((state) => state.failed && state.location !== null && !state.open)
   const initError = useChatStore((state) => state.initError)
   const saveError = useChatStore((state) => Object.values(state.sessionSaveErrors).some(Boolean))
   const importingHistory = useChatStore((state) => state.importingHistory)
@@ -56,16 +65,43 @@ export const App = () => {
     document.documentElement.lang = locale
   }, [locale])
 
-  // 文件数、存储空间达到上限时，附件上只显示「上传失败」，原因用 toast 说明
+  // 上传失败时，补充显示余额或配额相关提示。
   useEffect(() => onUploadNotice(showToast), [])
   useEffect(bindChatPersistence, [])
+  useEffect(bindHistoryLocation, [])
+  useEffect(() => {
+    if (ready) {
+      initHistoryLocation()
+    }
+  }, [ready])
 
   // 搜索结果面板只属于当前会话
   useEffect(closeSearchPanel, [activeId])
+  useEffect(closeSidePreview, [activeId])
   // 切换会话时停止朗读
   useEffect(stopReadAloud, [activeId])
   // 移动端选中会话、切换布局后收起抽屉
   useEffect(closeMobileSider, [activeId, isMobile])
+
+  useEffect(() => {
+    if (isMobile) {
+      return
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented || event.repeat || event.isComposing ||
+        !event.ctrlKey || event.altKey || event.shiftKey || event.metaKey ||
+        event.key.toLowerCase() !== 'j' ||
+        document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')
+      ) {
+        return
+      }
+      event.preventDefault()
+      newChat()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isMobile])
 
   useEffect(() => {
     void initChat()
@@ -76,8 +112,26 @@ export const App = () => {
   return (
     <>
       <div ref={frameRef} className={styles.frame}>
-        {isMobile ? <MobileSider /> : siderCollapsed ? null : <Sider />}
+        {isMobile ? <MobileSider /> : (
+          <div className={styles.desktopSider} data-collapsed={siderCollapsed}
+            ref={(element) => {
+              if (element) {
+                element.inert = siderCollapsed
+              }
+            }}>
+            <Sider />
+          </div>
+        )}
+        {!isMobile && <CollapsedSider visible={siderCollapsed} />}
         <main className={styles.main}>
+          {directorySaveError && (
+            <div className={styles.saveError} role="alert">
+              <span>{t('historyDirectoryFailed')}</span>
+              <Button variant="outlined" size="s" onClick={() => void retryHistoryLocationSave()}>
+                {t('retry')}
+              </Button>
+            </div>
+          )}
           {saveError ? (
             <div className={styles.saveError} role="alert">
               <span>{t('sessionSaveFailed')}</span>
@@ -92,11 +146,11 @@ export const App = () => {
             </div>
           ) : null}
           <div className={styles.content}>
-            {siderCollapsed ? <CollapsedSider /> : null}
             {!ready || (activeId !== null && !session) ? (
               <div className={styles.loadingView}>
                 {isMobile ? <MobileHeader /> : null}
-                <div className={styles.loadingState} role="status" aria-live="polite">
+                <div className={styles.loadingState} role="status" aria-live="polite"
+                  aria-busy={!(!ready ? initError : sessionLoadError)}>
                   <span>
                     {(!ready ? initError : sessionLoadError)
                       ? t(!ready ? 'sessionListLoadFailed' : 'sessionLoadFailed')
@@ -131,8 +185,11 @@ export const App = () => {
           </div>
         </main>
         <SearchPanel />
+        <SidePreview />
       </div>
       <SettingsDialog />
+      <HistoryLocationDialog />
+      {searching && <HistorySearch />}
       <Toast />
     </>
   )

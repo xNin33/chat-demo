@@ -4,7 +4,8 @@ import { useTranslate } from '../../i18n/index.js'
 import { MAX_COUNT, MAX_SIZE_MB } from '../../services/attachments.js'
 import styles from './DragMask.module.css'
 
-const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes('Files') ?? false
+export const hasDraggedFiles = (event: Pick<DragEvent, 'dataTransfer'>) =>
+  event.dataTransfer?.types.includes('Files') ?? false
 
 /**
  * 拖拽上传：页面任意位置拖入文件即显示全屏遮罩，松手后交给 onDrop。
@@ -17,30 +18,34 @@ export const useFileDrop = (onDrop: (files: File[]) => void) => {
     // dragenter / dragleave 会在子元素间反复触发，用计数判断是否真正离开页面
     let depth = 0
     const enter = (event: DragEvent) => {
-      if (hasFiles(event)) {
+      if (hasDraggedFiles(event)) {
         depth++
-        setDragging(true)
+        setDragging(!event.defaultPrevented)
       }
     }
     const leave = (event: DragEvent) => {
-      if (hasFiles(event) && --depth <= 0) {
+      if (hasDraggedFiles(event) && --depth <= 0) {
         depth = 0
         setDragging(false)
       }
     }
     const over = (event: DragEvent) => {
-      if (hasFiles(event)) {
+      if (hasDraggedFiles(event)) {
+        setDragging(!event.defaultPrevented)
         event.preventDefault()
       }
     }
     const drop = (event: DragEvent) => {
-      if (!hasFiles(event)) {
+      if (!hasDraggedFiles(event)) {
         return
       }
+      const handled = event.defaultPrevented
       event.preventDefault()
       depth = 0
       setDragging(false)
-      onDropRef.current(Array.from(event.dataTransfer?.files ?? []))
+      if (!handled) {
+        onDropRef.current(Array.from(event.dataTransfer?.files ?? []))
+      }
     }
     document.addEventListener('dragenter', enter)
     document.addEventListener('dragleave', leave)

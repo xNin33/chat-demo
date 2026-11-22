@@ -51,10 +51,12 @@ export const Modal = ({
   return createPortal(
     <div
       className={styles.overlay}
+      data-motion="fade"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
         className={clsx(styles.content, className)}
+        data-motion="enter"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

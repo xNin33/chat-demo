@@ -4,8 +4,9 @@ import { fromMarkdown } from 'mdast-util-from-markdown'
 import { gfmFromMarkdown } from 'mdast-util-gfm'
 import { mathFromMarkdown } from 'mdast-util-math'
 import { gfm } from 'micromark-extension-gfm'
-import { math } from 'micromark-extension-llm-math'
+import { cjkFriendlyExtension } from 'micromark-extension-cjk-friendly'
 import type { Source } from '../chat/view.js'
+import { mathSyntax } from './mathSyntax.js'
 
 /** 正文里的 [citation:N]，已换成对应来源 */
 export interface CitationNode extends MdAstNode {
@@ -39,7 +40,8 @@ export function toMdAst(
     extensions: [
       // codeIndented 语法导致有前导空格的列表无法正常渲染
       { ...gfm(), disable: { null: ['codeIndented'] } },
-      math({ singleDollarTextMath: true }),
+      cjkFriendlyExtension(),
+      mathSyntax(input),
     ],
     mdastExtensions: [gfmFromMarkdown(), mathFromMarkdown()],
   })

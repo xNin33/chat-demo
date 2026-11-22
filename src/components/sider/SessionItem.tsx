@@ -1,7 +1,12 @@
 import clsx from 'clsx'
 import { memo, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
-import { IconEditOutline16, IconEllipsisOutline16, IconTrashOutline16 } from '../base/icons.js'
+import {
+  IconCheckedOutline14,
+  IconEditOutline16,
+  IconEllipsisOutline16,
+  IconTrashOutline16,
+} from '../base/icons.js'
 import { renameSession, selectSession } from '../../services/chat/store.js'
 import type { SessionSummary } from '../../services/chat/types.js'
 import { IconButton } from '../base/IconButton.js'
@@ -13,14 +18,33 @@ export const SessionItem = memo(function SessionItem({
   session,
   active,
   onDelete,
+  selection,
 }: {
   session: SessionSummary
   active: boolean
   onDelete: () => void
+  selection?: { checked: boolean; disabled: boolean; toggle: () => void }
 }) {
   const t = useTranslate()
   const [editing, setEditing] = useState(false)
   const displayTitle = session.title || t('untitledChat')
+
+  if (selection) {
+    return (
+      <label className={clsx(styles.item, styles.selectionItem)}>
+        <input
+          type="checkbox"
+          checked={selection.checked}
+          disabled={selection.disabled}
+          onChange={selection.toggle}
+        />
+        <span className={styles.checkmark} aria-hidden="true">
+          <IconCheckedOutline14 />
+        </span>
+        <span className={styles.title}>{displayTitle}</span>
+      </label>
+    )
+  }
 
   if (editing) {
     const finish = (title: string) => {

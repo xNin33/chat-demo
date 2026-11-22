@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Source } from '../../services/chat/view.js'
+import { closeSidePreview } from '../files/sidePreviewState.js'
 
 /** 右侧「搜索结果」面板：同一入口再次点击收起，换入口时替换内容 */
 type SearchPanelState = {
@@ -10,9 +11,11 @@ type SearchPanelState = {
 
 export const useSearchPanel = create<SearchPanelState>(() => ({ entry: null, sources: [] }))
 
-export const toggleSearchPanel = (entry: string, sources: Source[]) =>
+export const toggleSearchPanel = (entry: string, sources: Source[]) => {
+  closeSidePreview()
   useSearchPanel.setState((state) =>
     state.entry === entry ? { entry: null, sources: [] } : { entry, sources }
   )
+}
 
 export const closeSearchPanel = () => useSearchPanel.setState({ entry: null, sources: [] })

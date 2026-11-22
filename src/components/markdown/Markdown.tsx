@@ -1,7 +1,6 @@
 import { memo, useMemo } from 'react'
 import type { Source } from '../../services/chat/view.js'
 import { toMdAst } from '../../services/markdown/parse.js'
-import { useScrollToBottom } from '../messages/scrollContext.js'
 import { MarkdownAstRenderer } from './MarkdownAstRenderer.js'
 import { useThrottleMarkdownRender } from './useThrottleMarkdownRender.js'
 import './markdown.css'
@@ -26,7 +25,6 @@ export const Markdown = memo(function Markdown({
   disableLink: boolean
   sources?: Source[]
 }) {
-  const scrollToBottom = useScrollToBottom()
   const throttledMarkdown = useThrottleMarkdownRender(content, loading)
   const ast = useMemo(
     () => (throttledMarkdown ? toMdAst(throttledMarkdown, { sources, disableLink }) : null),
@@ -38,7 +36,6 @@ export const Markdown = memo(function Markdown({
       className={className}
       ast={ast}
       loading={loading}
-      onUpdate={scrollToBottom}
     />
   ) : null
 })

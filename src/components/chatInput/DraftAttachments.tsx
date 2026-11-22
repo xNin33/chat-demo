@@ -1,38 +1,61 @@
 import clsx from 'clsx'
-import { memo } from 'react'
+import { memo, useState, type ReactNode } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { useUploads, type UploadTask } from '../../services/attachments.js'
 import type { DraftAttachment } from '../../services/chat/drafts.js'
 import { IconCloseFill14, IconRefreshOutline16 } from '../base/icons.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { FileCard } from '../files/FileCard.js'
+import { ImagePreview } from '../files/ImagePreview.js'
 import styles from './ChatInput.module.css'
 
 const UPLOADING: UploadTask = { status: 'uploading' }
 
-/** 列表只随草稿附件变化更新；每张卡片独立订阅自己的上传状态。 */
+/** 输入框共用的附件栏；已有附件排在新附件前面。 */
 export const DraftAttachments = memo(function DraftAttachments({
   items,
+  retained,
   onRetry,
   onRemove,
 }: {
   items: DraftAttachment[]
+  retained?: ReactNode
   onRetry: (id: string) => void
   onRemove: (id: string) => void
 }) {
-  if (items.length === 0) {
+  const [previewId, setPreviewId] = useState<string | null>(null)
+  const images = items.filter((item) => item.previewUrl !== null)
+  const activeIndex = images.findIndex((item) => item.id === previewId)
+  const active = images[activeIndex]
+  if (items.length === 0 && !retained) {
     return null
   }
   return (
     <div className={styles.attachments}>
+      {retained}
       {items.map((item) => (
         <AttachmentItem
           key={item.id}
           item={item}
+          onPreview={() => setPreviewId(item.id)}
           onRetry={() => onRetry(item.id)}
           onRemove={() => onRemove(item.id)}
         />
       ))}
+      {active?.previewUrl && (
+        <ImagePreview
+          src={active.previewUrl}
+          name={active.file.name}
+          onClose={() => setPreviewId(null)}
+          onStep={
+            images.length > 1
+              ? (direction) => {
+                  setPreviewId(images[(activeIndex + direction + images.length) % images.length].id)
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   )
 })
@@ -42,10 +65,12 @@ const AttachmentItem = ({
   item,
   onRetry,
   onRemove,
+  onPreview,
 }: {
   item: DraftAttachment
   onRetry: () => void
   onRemove: () => void
+  onPreview: () => void
 }) => {
   const t = useTranslate()
   const task = useUploads((state) => state.tasks[item.id] ?? UPLOADING)
@@ -62,20 +87,26 @@ const AttachmentItem = ({
       className={clsx(styles.attachment, failed && styles.attachmentFailed)}
       title={error ?? item.file.name}
     >
-      <img src={item.previewUrl} alt={item.file.name} />
+      <button
+        type="button"
+        className={styles.attachmentPreview}
+        aria-label={t('previewImage', { name: item.file.name })}
+        onClick={onPreview}
+      >
+        <img src={item.previewUrl} alt={item.file.name} />
+      </button>
       {status === 'uploading' ? <div className={styles.uploading} /> : null}
-      {failed && retry ? (
-        <Tooltip content={retryLabel}>
-          <button type="button" className={styles.failed} aria-label={retryLabel} onClick={retry}>
-            <IconRefreshOutline16 />
-            {showReason ? <span className={styles.failedReason}>{error}</span> : null}
-          </button>
-        </Tooltip>
-      ) : null}
-      {failed && !retry ? (
+      {failed ? (
         <div className={clsx(styles.failed, styles.failedStatic)} aria-label={error}>
           {showReason ? <span className={styles.failedReason}>{error}</span> : null}
         </div>
+      ) : null}
+      {failed && retry ? (
+        <Tooltip content={retryLabel}>
+          <button type="button" className={styles.attachmentRetry} aria-label={retryLabel} onClick={retry}>
+            <IconRefreshOutline16 />
+          </button>
+        </Tooltip>
       ) : null}
       <button
         type="button"

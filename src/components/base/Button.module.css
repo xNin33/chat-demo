@@ -17,7 +17,14 @@
   outline: none;
   transition:
     background-color var(--ds-transition-duration) var(--ds-ease-in-out),
-    opacity var(--ds-transition-duration) var(--ds-ease-in-out);
+    opacity var(--ds-transition-duration) var(--ds-ease-in-out),
+    scale var(--ds-transition-duration) var(--ds-ease-in-out);
+
+  @media (prefers-reduced-motion: no-preference) {
+    &:active:not(:disabled) {
+      scale: 0.97;
+    }
+  }
 
   &:focus-visible {
     box-shadow: 0 0 0 2px var(--dsw-alias-button-primary-fill);

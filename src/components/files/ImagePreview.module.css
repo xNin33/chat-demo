@@ -1,0 +1,87 @@
+.preview {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+.preview[open] {
+  animation: preview-in var(--ds-transition-duration) ease-out;
+}
+
+.preview::backdrop {
+  background: rgb(0 0 0 / 92%);
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.photo {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+  touch-action: none;
+  user-select: none;
+  transition: transform var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.photo[data-zoomed="true"] {
+  cursor: grab;
+}
+
+.photo[data-dragging="true"] {
+  cursor: grabbing;
+  transition: none;
+}
+
+.photo img {
+  display: block;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 128px);
+  object-fit: contain;
+}
+
+.close {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 50%;
+  background: #242424;
+  color: white;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: #404040;
+}
+
+.close:focus-visible,
+.photo:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+@keyframes preview-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

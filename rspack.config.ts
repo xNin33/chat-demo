@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from '@rspack/cli'
 import { rspack, type Configuration } from '@rspack/core'
 
-const dev = process.env.NODE_ENV !== 'production'
+const dev = process.env.NODE_ENV !== 'production' &&
+  !process.argv.some((arg, index, args) =>
+    arg === '--mode=production' || (arg === '--mode' && args[index + 1] === 'production'))
 const targets = ['chrome >= 105', 'edge >= 105', 'safari >= 16', 'firefox >= 110']
 const root = path.dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(
@@ -80,13 +82,17 @@ export const createConfig = ({
       scriptLoading: 'defer',
       meta: { 'application-version': version },
     }),
-    new rspack.DefinePlugin({ __API_ORIGIN__: JSON.stringify(apiOrigin) }),
+    new rspack.DefinePlugin({ __API_ORIGIN__: JSON.stringify(apiOrigin), __DEV_BUILD__: JSON.stringify(dev) }),
     new rspack.CopyRspackPlugin({
       patterns: [{ from: path.resolve(root, 'LICENSE'), to: 'LICENSE', toType: 'file' }],
     }),
   ],
   performance: { hints: false },
-  devServer: { port: 8090, ...devServer },
+  devServer: {
+    port: 8090,
+    proxy: [{ context: ['/api/attachments'], target: 'http://127.0.0.1:8091', changeOrigin: true }],
+    ...devServer,
+  },
 })
 
 // eslint-disable-next-line import/no-default-export

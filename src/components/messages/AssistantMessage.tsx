@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { memo } from 'react'
 import { IconRefreshOutline16, IconWarningOutline16 } from '../base/icons.js'
 import { describeReply } from '../../services/chat/describe.js'
+import { TOP_UP_URL } from '../../services/api/client.js'
 import { canContinueReply } from '../../services/chat/reply.js'
 import { continueReply, regenerateReply } from '../../services/chat/store.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
@@ -23,8 +24,6 @@ import {
   type SelectMessageVersion,
 } from './BranchSwitcher.js'
 import styles from './AssistantMessage.module.css'
-
-const TOP_UP_URL = 'https://platform.deepseek.com/top_up'
 
 export const AssistantMessage = memo(function AssistantMessage({
   sessionId,
