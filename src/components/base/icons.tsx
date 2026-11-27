@@ -113,6 +113,21 @@ export const IconEditOutline16 = () => (
   </svg>
 )
 
+export const IconSelectTextOutline20 = () => (
+  <svg width={20} height={20} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path d="M2.4 3.5h5m-2.5 0v13m-2.5 0h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M10.5 3.5h6.8v13h-6.8" stroke="currentColor" strokeWidth="1.45"
+      strokeDasharray="1.3 2.3" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
+export const IconShareOutline20 = () => (
+  <svg width={20} height={20} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path d="M10.8 3.1 17.5 9l-6.7 6.1v-3.6c-3.1 0-5.7 1.35-8.3 4.2.5-5.25 3.5-8.6 8.3-9.15V3.1Z"
+      stroke="currentColor" strokeWidth="1.55" strokeLinejoin="round" />
+  </svg>
+)
+
 export const IconEllipsisOutline16 = () => (
   <svg width={16} height={16} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path
@@ -429,6 +444,50 @@ export const IconSearchOutline16 = () => (
       d="M15.6991 14.7513L14.7792 15.6712L11.3974 12.2894L12.3173 11.3694L15.6991 14.7513Z"
       fill="currentColor"
     />
+  </svg>
+)
+
+export const IconAttachPlus20 = () => (
+  <svg width={22} height={22} viewBox="0 0 22 22" fill="none" aria-hidden="true">
+    <circle cx="11" cy="11" r="9.2" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M7.2 11h7.6M11 7.2v7.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+  </svg>
+)
+
+export const IconCameraOutline20 = () => (
+  <svg width={22} height={22} viewBox="0 0 22 22" fill="none" aria-hidden="true" stroke="currentColor" strokeWidth="1.6">
+    <path d="M4.8 6h2.5l1.5-2h4.4l1.5 2h2.5A2.8 2.8 0 0 1 20 8.8v6.4a2.8 2.8 0 0 1-2.8 2.8H4.8A2.8 2.8 0 0 1 2 15.2V8.8A2.8 2.8 0 0 1 4.8 6Z" strokeLinejoin="round" />
+    <circle cx="11" cy="11.8" r="3.1" />
+  </svg>
+)
+
+export const IconPhotoOutline20 = () => (
+  <svg width={22} height={22} viewBox="0 0 22 22" fill="none" aria-hidden="true" stroke="currentColor" strokeWidth="1.6">
+    <rect x="2.3" y="3" width="17.4" height="16" rx="3" />
+    <circle cx="14.5" cy="7.8" r="1.55" />
+    <path d="m2.8 15.4 4.4-4.1a1.4 1.4 0 0 1 2 0l7.7 7.3" strokeLinecap="round" />
+  </svg>
+)
+
+export const IconRotatePhoto20 = () => (
+  <svg width={20} height={20} viewBox="0 0 20 20" fill="none" aria-hidden="true" stroke="currentColor" strokeWidth="1.55">
+    <rect x="2.5" y="7.1" width="10.4" height="10.4" rx="2" />
+    <path d="M17.5 10.4a6.2 6.2 0 0 0-6.2-6.2H9.7m2.3-2.3L9.7 4.2 12 6.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
+export const IconHistorySearchOutline20 = () => (
+  <svg width={20} height={20} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <circle cx="8.5" cy="8.5" r="5.75" stroke="currentColor" strokeWidth="1.6" />
+    <path d="m12.8 12.8 4.4 4.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+  </svg>
+)
+
+export const IconConversationOutline20 = () => (
+  <svg width={20} height={20} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+    <path d="M4.1 14.6a7.6 7.6 0 1 1 2.3 2.25L2.8 18l1.3-3.4Z" stroke="currentColor"
+      strokeWidth="1.55" strokeLinejoin="round" />
+    <path d="M6.25 8.25h7.5m-7.5 3H11" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
   </svg>
 )
 

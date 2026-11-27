@@ -331,10 +331,10 @@ export const updateStagingFileTypes = async (types: ReadonlyMap<string, string>)
  * 导入完成后在同一事务中替换会话、摘要和磁盘引用；提交后才清理旧原件。
  * 逐条游标复制，同一时间只读取一条记录；事务失败时整体回滚，正式数据不变。
  */
-export const commitStaging = async (): Promise<SessionSummary[]> => {
+export const commitStaging = async (location?: HistoryLocation): Promise<SessionSummary[]> => {
   const summaries: SessionSummary[] = []
   const tx = (await getDB()).transaction(
-    ['sessions', 'sessionSummaries', 'files', 'sessionsStaging', 'filesStaging'],
+    ['sessions', 'sessionSummaries', 'files', 'sessionsStaging', 'filesStaging', 'storagePreferences'],
     'readwrite'
   )
   const oldFiles = await tx.objectStore('files').getAll()
@@ -364,7 +364,22 @@ export const commitStaging = async (): Promise<SessionSummary[]> => {
       throw error
     }
   }
-  await Promise.all([move('sessionsStaging', 'sessions'), move('filesStaging', 'files'), tx.done])
+  const saveLocation = async () => {
+    if (location) {
+      try {
+        await tx.objectStore('storagePreferences').put(location, 'historyLocation')
+      } catch (error) {
+        abortTransaction(tx)
+        throw error
+      }
+    }
+  }
+  await Promise.all([
+    move('sessionsStaging', 'sessions'),
+    move('filesStaging', 'files'),
+    saveLocation(),
+    tx.done,
+  ])
   await cleanFiles(oldFiles.filter((file): file is DiskFile => 'diskId' in file))
   notifyHistoryChanged()
   // 直接返回本次提交的列表，调用方无需在替换成功后再发起可能失败的读取。

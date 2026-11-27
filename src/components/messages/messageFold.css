@@ -1,0 +1,43 @@
+.message-fold {
+  --fold-limit: 216px;
+  --fold-surface: var(--dsw-specific-bubble);
+  position: relative;
+  min-width: 0;
+}
+
+.message-fold-content {
+  display: flow-root;
+}
+
+.message-fold[data-folded='true'] .message-fold-viewport {
+  max-height: var(--fold-limit);
+  overflow: clip;
+}
+
+.message-fold-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.message-fold[data-folded='true'] .message-fold-action {
+  position: absolute;
+  inset: auto 0 0;
+  padding-top: 14px;
+  background: linear-gradient(transparent, var(--fold-surface) 82%);
+  pointer-events: none;
+}
+
+.message-fold-action button {
+  width: 32px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-3);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 7%);
+  pointer-events: auto;
+}
+
+.message-fold-action button[aria-expanded='true'] svg {
+  rotate: 180deg;
+}
+

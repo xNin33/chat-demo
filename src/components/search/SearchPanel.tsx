@@ -1,6 +1,8 @@
+import { useRef } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { IconCloseOutline16 } from '../base/icons.js'
 import { IconButton } from '../base/IconButton.js'
+import { playExit } from '../base/playExit.js'
 import { closeSearchPanel, useSearchPanel } from './searchPanelState.js'
 import { SourceCard } from './SourceCard.js'
 import styles from './SearchPanel.module.css'
@@ -8,13 +10,14 @@ import styles from './SearchPanel.module.css'
 /** 右侧「搜索结果」面板 */
 export const SearchPanel = () => {
   const t = useTranslate()
+  const panel = useRef<HTMLElement>(null)
   const entry = useSearchPanel((state) => state.entry)
   const sources = useSearchPanel((state) => state.sources)
   if (!entry) {
     return null
   }
   return (
-    <aside className={styles.panel} data-motion="fade">
+    <aside ref={panel} className={styles.panel} data-motion="fade">
       <div className={styles.header}>
         <div role="heading" className={styles.title}>
           {t('searchResult')}
@@ -22,7 +25,13 @@ export const SearchPanel = () => {
         <IconButton
           icon={<IconCloseOutline16 />}
           aria-label={t('close')}
-          onClick={closeSearchPanel}
+          onClick={() =>
+            playExit(panel.current, () => {
+              if (useSearchPanel.getState().entry === entry) {
+                closeSearchPanel()
+              }
+            })
+          }
         />
       </div>
       <div className={styles.content}>

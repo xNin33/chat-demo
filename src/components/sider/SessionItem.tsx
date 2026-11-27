@@ -5,12 +5,15 @@ import {
   IconCheckedOutline14,
   IconEditOutline16,
   IconEllipsisOutline16,
+  IconPinOutline16,
   IconTrashOutline16,
 } from '../base/icons.js'
-import { renameSession, selectSession } from '../../services/chat/store.js'
+import { renameSession, selectSession, setSessionsPinned } from '../../services/chat/store.js'
 import type { SessionSummary } from '../../services/chat/types.js'
 import { IconButton } from '../base/IconButton.js'
 import { Menu } from '../base/Menu.js'
+import { useLongPress } from '../base/useLongPress.js'
+import { showToast } from '../base/toastState.js'
 import { closeMobileSider } from './mobileSiderState.js'
 import styles from './SessionItem.module.css'
 
@@ -19,14 +22,17 @@ export const SessionItem = memo(function SessionItem({
   active,
   onDelete,
   selection,
+  mobile = false,
 }: {
   session: SessionSummary
   active: boolean
   onDelete: () => void
+  mobile?: boolean
   selection?: { checked: boolean; disabled: boolean; toggle: () => void }
 }) {
   const t = useTranslate()
   const [editing, setEditing] = useState(false)
+  const hold = useLongPress(mobile && !editing && !selection)
   const displayTitle = session.title || t('untitledChat')
 
   if (selection) {
@@ -71,9 +77,18 @@ export const SessionItem = memo(function SessionItem({
     )
   }
 
+  const togglePin = async () => {
+    if (!(await setSessionsPinned(new Set([session.id]), !session.pinned))) {
+      showToast({ key: 'pinSessionsFailed', type: 'error' })
+    }
+  }
+
   return (
     <div
       className={clsx(styles.item, active && styles.active)}
+      data-press-menu={mobile ? '' : undefined}
+      data-press-pulse={hold.pulsing || undefined}
+      {...hold.handlers}
       onClick={() => {
         selectSession(session.id)
         closeMobileSider()
@@ -82,7 +97,15 @@ export const SessionItem = memo(function SessionItem({
       <div className={styles.title}>{displayTitle}</div>
       <div className={styles.action} onClick={(event) => event.stopPropagation()}>
         <Menu
+          point={hold.point}
+          onDismiss={hold.dismiss}
           options={[
+            {
+              key: 'pin',
+              label: t(session.pinned ? 'unpinSessions' : 'pinSessions'),
+              icon: <IconPinOutline16 />,
+              onSelect: () => void togglePin(),
+            },
             {
               key: 'rename',
               label: t('sessionItemMenuRenameOption'),
@@ -98,9 +121,17 @@ export const SessionItem = memo(function SessionItem({
             },
           ]}
         >
-          {({ toggle }) => (
-            <IconButton icon={<IconEllipsisOutline16 />} aria-label={t('more')} onClick={toggle} />
-          )}
+          {mobile
+            ? undefined
+            : ({ open, toggle }) => (
+                <IconButton
+                  icon={<IconEllipsisOutline16 />}
+                  aria-label={t('more')}
+                  aria-haspopup="menu"
+                  aria-expanded={open}
+                  onClick={toggle}
+                />
+              )}
         </Menu>
       </div>
     </div>

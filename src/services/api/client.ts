@@ -1,5 +1,6 @@
 import { translate, type TranslationMessage } from '../../i18n/index.js'
 import { resizeUploadImage } from '../../utils/resizeUploadImage.js'
+import { API_ORIGIN, filesEndpoint, type ApiConnection } from './config.js'
 import { readMessageEvent } from './parseEvent.js'
 import { readServerSentEvents } from './sse.js'
 import type {
@@ -11,10 +12,7 @@ import type {
 } from './types.js'
 
 /** 构建期 API 地址，默认 https://api.deepseek.com；本地开发支持开发服务器代理 */
-export const API_ORIGIN = __API_ORIGIN__
 export const TOP_UP_URL = 'https://platform.deepseek.com/top_up'
-/** Anthropic 兼容接口的前缀 */
-const ANTHROPIC_BASE_URL = `${API_ORIGIN}/anthropic/v1`
 /** 引用 Files API 上传的图片、调用 Anthropic 兼容 Files API 时必须携带 */
 const FILES_BETA = 'files-api-2025-04-14'
 
@@ -84,9 +82,10 @@ export const request = async (url: string, init: RequestInit): Promise<Response>
   return response
 }
 
-const anthropicHeaders = (apiKey: string, beta: boolean): Record<string, string> => ({
+const anthropicHeaders = (connection: ApiConnection, beta: boolean): Record<string, string> => ({
   // DeepSeek 兼容接口的鉴权方式，也可使用 Authorization: Bearer。
-  'x-api-key': apiKey,
+  ...(connection.apiKey ? { 'x-api-key': connection.apiKey } : {}),
+  ...(connection.mode === 'custom' ? { 'anthropic-version': '2023-06-01' } : {}),
   // Files API 和通过 file_id 引用图片时必传；纯文本聊天无需携带。
   ...(beta ? { 'anthropic-beta': FILES_BETA } : {}),
 })
@@ -105,19 +104,20 @@ export const verifyApiKey = async (apiKey: string, signal?: AbortSignal): Promis
  * purpose 为 null 时不传该字段（图片）；purpose 必须排在 file 之前。
  */
 export const uploadFile = async (
-  apiKey: string,
+  connection: ApiConnection,
   file: File,
   purpose: FilePurpose | null,
   signal?: AbortSignal
 ): Promise<FileObject> => {
   const form = new FormData()
-  if (purpose) {
+  if (purpose && connection.mode === 'native') {
     form.append('purpose', purpose)
   }
-  form.append('file', purpose === null ? await resizeUploadImage(file, signal) : file)
-  const response = await request(`${ANTHROPIC_BASE_URL}/files`, {
+  form.append('file', purpose === null && connection.mode === 'native' ? await resizeUploadImage(file, signal) : file)
+  const response = await request(filesEndpoint(connection.messagesUrl), {
     method: 'POST',
-    headers: anthropicHeaders(apiKey, true),
+    headers: anthropicHeaders(connection, true),
+    redirect: connection.mode === 'custom' ? 'error' : 'follow',
     body: form,
     signal,
   })
@@ -125,10 +125,11 @@ export const uploadFile = async (
 }
 
 /** DELETE /anthropic/v1/files/{file_id} */
-export const deleteFile = async (apiKey: string, fileId: string): Promise<void> => {
-  await request(`${ANTHROPIC_BASE_URL}/files/${encodeURIComponent(fileId)}`, {
+export const deleteFile = async (connection: ApiConnection, fileId: string): Promise<void> => {
+  await request(filesEndpoint(connection.messagesUrl, fileId), {
     method: 'DELETE',
-    headers: anthropicHeaders(apiKey, true),
+    headers: anthropicHeaders(connection, true),
+    redirect: connection.mode === 'custom' ? 'error' : 'follow',
   })
 }
 
@@ -144,14 +145,15 @@ const hasFile = (body: CreateMessageRequest) =>
  * ping、保活注释与无法解析的内容不产出；中止请求时抛出 signal 的 AbortError。
  */
 export async function* streamMessage(
-  apiKey: string,
+  connection: ApiConnection,
   body: CreateMessageRequest,
   signal: AbortSignal
 ): AsyncGenerator<MessageStreamEvent> {
-  const response = await request(`${ANTHROPIC_BASE_URL}/messages`, {
+  const response = await request(connection.messagesUrl, {
     method: 'POST',
+    redirect: connection.mode === 'custom' ? 'error' : 'follow',
     headers: {
-      ...anthropicHeaders(apiKey, hasFile(body)),
+      ...anthropicHeaders(connection, hasFile(body)),
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },

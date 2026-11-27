@@ -14,6 +14,7 @@
 }
 
 .files {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -50,6 +51,7 @@
 }
 
 .bubble {
+  position: relative;
   max-width: calc(100% - 88px);
   box-sizing: border-box;
   padding: 10px 16px;
@@ -121,6 +123,16 @@
   flex: none;
 }
 
+.editor[data-editor-composer="true"] {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+
 .textarea {
   display: block;
   width: 100%;
@@ -133,10 +145,18 @@
   resize: none;
   font: inherit;
   font-size: 16px;
-  font-size: 16px;
   line-height: 24px;
   color: var(--dsw-alias-label-primary);
   background: transparent;
+}
+
+.editor[data-editor-composer="true"] .textarea {
+  flex: 1 0 auto;
+  min-height: 56px;
+  max-height: none;
+  padding-inline: 16px;
+  overscroll-behavior: contain;
+  caret-color: var(--dsw-alias-brand-text);
 }
 
 .editorActions {

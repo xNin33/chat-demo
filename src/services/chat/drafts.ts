@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { TranslationMessage } from '../../i18n/index.js'
 import { createId } from '../../utils/id.js'
+import { getChatConnection } from '../settings.js'
+import type { ApiConnection } from '../api/config.js'
 import {
   cancelUpload,
   isImage,
@@ -46,10 +48,10 @@ const updateDraft = (sessionId: DraftKey, update: (draft: Draft) => Draft) =>
 export const setDraftText = (sessionId: string | null, text: string) =>
   updateDraft(sessionId, (draft) => ({ ...draft, text }))
 
-const upload = (attachment: DraftAttachment, apiKey: string) => {
+const upload = (attachment: DraftAttachment, connection: ApiConnection) => {
   // 上传任务负责记录错误，输入框的附件卡片展示失败及重试入口。
   void uploadAttachment(
-    apiKey,
+    connection,
     attachment.id,
     attachment.file,
     attachment.file.name,
@@ -61,11 +63,14 @@ const upload = (attachment: DraftAttachment, apiKey: string) => {
 export const addDraftFiles = (
   sessionId: DraftKey,
   files: File[],
-  apiKey: string,
   retainedCount = 0
 ): TranslationMessage | null => {
   if (files.length === 0) {
     return null
+  }
+  const connection = getChatConnection()
+  if (!connection) {
+    return { key: 'apiSettingsInvalid' }
   }
   const error = validateFiles(files, retainedCount + getDraft(sessionId).attachments.length)
   if (error) {
@@ -77,18 +82,15 @@ export const addDraftFiles = (
     isImage: isImage(resolveMimeType(file)),
   }))
   updateDraft(sessionId, (draft) => ({ ...draft, attachments: [...draft.attachments, ...added] }))
-  added.forEach((attachment) => upload(attachment, apiKey))
+  added.forEach((attachment) => upload(attachment, connection))
   return null
 }
 
-export const retryDraftAttachment = (
-  sessionId: DraftKey,
-  attachmentId: string,
-  apiKey: string
-) => {
+export const retryDraftAttachment = (sessionId: DraftKey, attachmentId: string) => {
   const attachment = getDraft(sessionId).attachments.find((item) => item.id === attachmentId)
-  if (attachment) {
-    upload(attachment, apiKey)
+  const connection = getChatConnection()
+  if (attachment && connection) {
+    upload(attachment, connection)
   }
 }
 
@@ -111,6 +113,7 @@ export const prepareDraftMessage = (
     files.push({
       id: attachment.id,
       serverId: task.serverId,
+      fileScope: task.fileScope,
       name: attachment.file.name,
       size: attachment.file.size,
       isImage: attachment.isImage,

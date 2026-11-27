@@ -1,7 +1,8 @@
-import { useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { IconCloseOutline16 } from '../base/icons.js'
 import { IconButton } from '../base/IconButton.js'
+import { playExit } from '../base/playExit.js'
 import { HtmlPreview } from '../markdown/HtmlPreview.js'
 import { FilePreview } from './FilePreview.js'
 import { closeSidePreview, useSidePreview } from './sidePreviewState.js'
@@ -13,6 +14,7 @@ const clampWidth = (width: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, wi
 
 export const SidePreview = () => {
   const t = useTranslate()
+  const panel = useRef<HTMLElement>(null)
   const preview = useSidePreview((state) => state.preview)
   const [widths, setWidths] = useState({ html: 34, file: 50 })
   if (!preview) {
@@ -30,6 +32,7 @@ export const SidePreview = () => {
 
   return (
     <aside
+      ref={panel}
       className={styles.panel}
       aria-label={label}
       data-motion="fade"
@@ -72,7 +75,13 @@ export const SidePreview = () => {
         <IconButton
           icon={<IconCloseOutline16 />}
           aria-label={t('close')}
-          onClick={closeSidePreview}
+          onClick={() =>
+            playExit(panel.current, () => {
+              if (useSidePreview.getState().preview === preview) {
+                closeSidePreview()
+              }
+            })
+          }
         />
       </header>
       {kind === 'html' ? (

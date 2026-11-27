@@ -17,6 +17,8 @@ import type {
 export type FileAttachment = {
   id: string
   serverId: string | null
+  /** 记录文件 ID 所属的 API 连接；旧记录默认属于既有原生连接。 */
+  fileScope?: string
   /** 当前 serverId 对应的上传图片已确认符合长边限制。旧记录缺少此字段。 */
   imageSizeChecked?: boolean
   name: string

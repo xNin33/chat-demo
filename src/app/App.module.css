@@ -1,7 +1,14 @@
 .frame {
   --desktop-sider-width: 261px;
-  --sidebar-transition-duration: min(var(--ds-transition-duration-slow), 220ms);
-  --sidebar-transition-easing: cubic-bezier(0.35, 0, 0.45, 1);
+  --sidebar-transition-duration: min(var(--ds-transition-duration-slow), 280ms);
+  --sidebar-transition-easing: cubic-bezier(0.4, 0, 0.3, 1);
+  --sidebar-toolbar-fade: min(var(--ds-transition-duration), 120ms);
+  --sidebar-toolbar-delay: min(var(--ds-transition-duration-slow), 120ms);
+  --desktop-header-top: 12px;
+  --desktop-header-inset: 16px;
+  --desktop-header-control-height: 40px;
+  --desktop-header-gap: 10px;
+  --collapsed-toolbar-width: 112px;
   position: absolute;
   inset: 0;
   display: flex;
@@ -10,6 +17,8 @@
 }
 
 .desktopSider {
+  position: relative;
+  z-index: 21;
   width: var(--desktop-sider-width);
   flex: none;
   margin-inline-start: 0;
@@ -87,9 +96,35 @@
 
 @media not all and (min-width: 768px) {
   .frame {
+    --mobile-sider-width: min(82vw, 340px);
+    --mobile-sider-progress: 0;
+    --mobile-sider-offset: calc(var(--mobile-sider-width) * var(--mobile-sider-progress));
+    --mobile-sider-scale: calc(1 - 0.045 * var(--mobile-sider-progress));
+    --mobile-sider-release: var(--sidebar-transition-duration) cubic-bezier(0.16, 1, 0.3, 1);
     position: fixed;
     top: var(--app-viewport-top, 0px);
     bottom: auto;
     height: var(--app-viewport-height, 100dvh);
+  }
+
+  .frame[data-mobile-sider-open="true"] {
+    --mobile-sider-progress: 1;
+  }
+
+  .main {
+    z-index: 2;
+    background: var(--dsw-alias-bg-base);
+    translate: var(--mobile-sider-offset) 0;
+    scale: var(--mobile-sider-scale);
+    transform-origin: left center;
+    border-radius: calc(24px * var(--mobile-sider-progress));
+    box-shadow: -10px 4px 26px rgb(16 24 40 / calc(0.21 * var(--mobile-sider-progress)));
+    overflow: hidden;
+    transition: translate var(--mobile-sider-release), scale var(--mobile-sider-release),
+      border-radius var(--mobile-sider-release), box-shadow var(--mobile-sider-release);
+  }
+
+  .frame[data-sider-dragging] .main {
+    transition: none;
   }
 }

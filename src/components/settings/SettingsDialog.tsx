@@ -36,6 +36,7 @@ import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { showToast } from '../base/toastState.js'
 import { ApiKeyConfirm, ApiKeyField, useApiKeyEditor } from './ApiKeyField.js'
+import { ApiModeSetting, CustomApiSetting } from './ApiSettings.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './Settings.module.css'
 
@@ -60,6 +61,7 @@ const sections: { value: SettingsSection; label: TranslationKey; icon: ReactNode
 const SettingsContent = () => {
   const t = useTranslate()
   const isMobile = useIsMobile()
+  const apiMode = useSettings((state) => state.apiMode)
   // 打开时按调用方指定的分组选中，之后在弹窗内切换
   const [section, setSection] = useState(() => useSettingsDialog.getState().section)
   // 切换分组不丢失正在输入的 API Key 与导入状态
@@ -106,6 +108,8 @@ const SettingsContent = () => {
             </>
           ) : (
             <>
+              <ApiModeSetting />
+              {apiMode === 'custom' && <CustomApiSetting />}
               <ApiKeyField editor={apiKeyEditor} />
               {canChooseHistoryDirectory && <HistoryLocationSetting disabled={historyBusy} />}
               <ImportHistory historyImport={historyImport} disabled={historyBusy} />

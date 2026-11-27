@@ -35,6 +35,7 @@ body.dark {
 body[data-ds-dark-theme] {
   --scroll-color: rgba(255, 255, 255, 0.15);
   --scroll-color-hover: rgba(255, 255, 255, 0.24);
+  --long-press-pulse-fill: rgb(255 255 255 / 9%);
 }
 
 [data-motion="fade"] {
@@ -45,8 +46,36 @@ body[data-ds-dark-theme] {
   animation: ds-enter var(--ds-transition-duration) var(--ds-ease-in-out);
 }
 
+[data-press-menu] {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-press-pulse]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-color: var(--long-press-pulse-fill, rgb(0 0 0 / 7%));
+    pointer-events: none;
+    animation: ds-press-pulse 180ms ease-in-out both;
+  }
+}
+
+@keyframes ds-press-pulse {
+  0%, 100% { opacity: 0; }
+  45% { opacity: 1; }
+}
+
 @keyframes ds-fade-in {
   from {
+    opacity: 0;
+  }
+}
+
+@keyframes ds-fade-out {
+  to {
     opacity: 0;
   }
 }

@@ -1,4 +1,5 @@
-import { ApiError, API_ORIGIN, request } from './client.js'
+import { ApiError, request } from './client.js'
+import { API_ORIGIN } from './config.js'
 
 /**
  * 语音接口：

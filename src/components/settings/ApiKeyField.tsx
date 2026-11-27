@@ -26,7 +26,7 @@ export const ApiKeyField = ({ editor }: { editor: ApiKeyEditor }) => {
   return (
     <div className={styles.cell}>
       <div className={styles.apiKey}>
-        <div className={styles.label}>{t('apiKeyStart')}</div>
+        <div className={styles.label}>{t('apiDeepSeekKey')}</div>
         {apiKey && !editing ? (
           <div className={styles.apiKeySaved}>
             <span className={styles.apiKeyMask}>{'*'.repeat(apiKey.length)}</span>

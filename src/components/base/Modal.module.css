@@ -33,6 +33,21 @@
     0 12px 32px 0 rgba(0, 0, 0, 0.08);
 }
 
+.overlay[data-exiting][data-motion='fade'] {
+  animation: ds-fade-out var(--ds-transition-duration) var(--ds-ease-in-out) both;
+}
+
+.overlay[data-exiting] > .content[data-motion='enter'] {
+  pointer-events: none;
+  animation: modal-exit var(--ds-transition-duration) var(--ds-ease-in-out) both;
+}
+
+@keyframes modal-exit {
+  to {
+    translate: 0 5px;
+  }
+}
+
 .header {
   display: flex;
   align-items: center;

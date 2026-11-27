@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { LinkedMessage, TranslationMessage } from '../i18n/index.js'
 import { isUploadImageOversized } from '../utils/resizeUploadImage.js'
 import { TOP_UP_URL, uploadFile } from './api/client.js'
+import type { ApiConnection } from './api/config.js'
 import { classifyApiError, getUploadErrorInfo, isRetryableUploadError } from './api/errors.js'
 import type { FilePurpose } from './api/types.js'
 import { loadFile } from './chat/db.js'
@@ -132,7 +133,7 @@ const next = () => {
 
 /** 排队上传，最多同时上传 MAX_CONCURRENT 个；排队期间中止的任务不会发出请求 */
 const enqueueUpload = (
-  apiKey: string,
+  connection: ApiConnection,
   file: Blob,
   name: string,
   isImage: boolean,
@@ -146,7 +147,7 @@ const enqueueUpload = (
       }
       try {
         const body = file instanceof File ? file : new File([file], name, { type: file.type })
-        resolve((await uploadFile(apiKey, body, getUploadPurpose(name, isImage), signal)).id)
+        resolve((await uploadFile(connection, body, getUploadPurpose(name, isImage), signal)).id)
       } catch (error) {
         reject(error)
       }
@@ -161,7 +162,7 @@ const enqueueUpload = (
  */
 export type UploadTask =
   | { status: 'uploading' }
-  | { status: 'done'; serverId: string }
+  | { status: 'done'; serverId: string; fileScope?: string }
   | { status: 'error'; error: TranslationMessage; retryable: boolean }
 
 type UploadState = { tasks: Record<string, UploadTask> }
@@ -175,28 +176,35 @@ const setTask = (id: string, task: UploadTask | null) =>
       : Object.fromEntries(Object.entries(state.tasks).filter(([key]) => key !== id)),
   }))
 
-const pending = new Map<string, { promise: Promise<string>; controller: AbortController }>()
+const pending = new Map<string, { promise: Promise<string>; controller: AbortController; fileScope?: string }>()
 
 /** 开始（或复用进行中的）上传，返回服务端 file_id；失败时任务记为 error 并抛出原错误 */
 export const uploadAttachment = (
-  apiKey: string,
+  connection: ApiConnection,
   id: string,
   blob: Blob,
   name: string,
   isImage: boolean
 ): Promise<string> => {
   const current = pending.get(id)
-  if (current) {
+  if (current && current.fileScope === connection.fileScope) {
     return current.promise
   }
+  current?.controller.abort()
   const controller = new AbortController()
+  const isCurrent = () => pending.get(id)?.controller === controller
   setTask(id, { status: 'uploading' })
-  const promise = enqueueUpload(apiKey, blob, name, isImage, controller.signal)
+  const promise = enqueueUpload(connection, blob, name, isImage, controller.signal)
     .then((serverId) => {
-      setTask(id, { status: 'done', serverId })
+      if (isCurrent()) {
+        setTask(id, { status: 'done', serverId, fileScope: connection.fileScope })
+      }
       return serverId
     })
     .catch((error: unknown) => {
+      if (!isCurrent()) {
+        throw error
+      }
       if (controller.signal.aborted) {
         setTask(id, null)
       } else {
@@ -205,7 +213,7 @@ export const uploadAttachment = (
           error: describeUploadError(error),
           retryable: isRetryableUploadError(error),
         })
-        const notice = describeUploadNotice(error)
+        const notice = connection.mode === 'native' ? describeUploadNotice(error) : undefined
         if (notice) {
           for (const listener of noticeListeners) {
             listener(notice)
@@ -214,13 +222,18 @@ export const uploadAttachment = (
       }
       throw error
     })
-    .finally(() => pending.delete(id))
-  pending.set(id, { promise, controller })
+    .finally(() => {
+      if (isCurrent()) {
+        pending.delete(id)
+      }
+    })
+  pending.set(id, { promise, controller, fileScope: connection.fileScope })
   return promise
 }
 
 export const cancelUpload = (id: string) => {
   pending.get(id)?.controller.abort()
+  pending.delete(id)
   setTask(id, null)
 }
 

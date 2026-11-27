@@ -19,16 +19,20 @@
     color: var(--dsw-alias-brand-primary-invert);
   }
 
+  &:is(.active, :focus-within) .action,
+  .action:has([aria-expanded="true"]) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   @media (hover: hover) {
     &:not(.active):hover {
       background-color: var(--dsw-specific-sidebar-nav-item-hover);
     }
 
-    &:hover,
-    &.active {
-      .action {
-        display: flex;
-      }
+    &:hover .action {
+      opacity: 1;
+      pointer-events: auto;
     }
   }
 }
@@ -87,9 +91,15 @@
 }
 
 .action {
-  display: none;
+  display: flex;
   flex-shrink: 0;
   margin-left: 4px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.action:empty {
+  display: none;
 }
 
 .renameInput {
@@ -108,7 +118,8 @@
 
 @media (hover: none) {
   .action {
-    display: flex;
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 

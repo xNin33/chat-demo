@@ -47,6 +47,7 @@ export type AnchoredOptions = {
    * 旧位置绘制一帧再回弹，所以需要这个同步入口。
    */
   measureKey?: unknown
+  point?: { x: number; y: number } | null
 }
 
 const clampLeft = (left: number, width: number) =>
@@ -93,6 +94,7 @@ export const useAnchoredPosition = <T extends HTMLElement, F extends HTMLElement
     minSpace = 160,
     measureFirstChild = false,
     measureKey,
+    point,
   }: AnchoredOptions = {}
 ) => {
   const anchorRef = useRef<T | null>(null) as MutableRefObject<T | null>
@@ -123,20 +125,22 @@ export const useAnchoredPosition = <T extends HTMLElement, F extends HTMLElement
 
   // 测量只在浮层打开且已挂载后进行，ref 对象稳定，回调不随渲染重建
   const update = useCallback(() => {
-    const anchor = getAnchor()
     const floating = floatingRef.current
-    if (!anchor || !floating) {
+    const rect = point ? new DOMRect(point.x, point.y) : getAnchor()?.getBoundingClientRect()
+    if (!rect || !floating) {
       return
     }
-    const rect = anchor.getBoundingClientRect()
     const spaceAbove = rect.top - offset - VIEWPORT_PADDING
     const spaceBelow = window.innerHeight - rect.bottom - offset - VIEWPORT_PADDING
 
     if (maxHeight === undefined) {
-      const { width, height } = floating.getBoundingClientRect()
+      const { width, height } = point
+        ? { width: floating.offsetWidth, height: floating.offsetHeight }
+        : floating.getBoundingClientRect()
       const resolved = resolveSide(spaceAbove, spaceBelow, side, height)
+      const top = resolved === 'top' ? rect.top - offset - height : rect.bottom + offset
       applyPosition({
-        top: resolved === 'top' ? rect.top - offset - height : rect.bottom + offset,
+        top: point ? Math.max(VIEWPORT_PADDING, Math.min(top, window.innerHeight - height - VIEWPORT_PADDING)) : top,
         left: alignLeft(rect, width, align, alignOffset),
       })
       return
@@ -154,7 +158,7 @@ export const useAnchoredPosition = <T extends HTMLElement, F extends HTMLElement
       right: Math.max(VIEWPORT_PADDING, window.innerWidth - rect.right),
       maxHeight: height,
     })
-  }, [align, alignOffset, applyPosition, floatingRef, getAnchor, maxHeight, minSpace, offset, side])
+  }, [align, alignOffset, applyPosition, floatingRef, getAnchor, maxHeight, minSpace, offset, point, side])
 
   // 打开时与内容变化时同步测量，必须在绘制前完成
   useLayoutEffect(() => {

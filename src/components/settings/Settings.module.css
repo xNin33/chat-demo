@@ -211,6 +211,26 @@
   padding-bottom: 4px;
 }
 
+.apiConfiguration,
+.apiField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.apiConfiguration {
+  gap: 14px;
+  padding: 12px 0 16px;
+}
+
+.apiSearchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 12px;
+}
+
 .apiKeySaved,
 .apiKeyInput {
   display: flex;

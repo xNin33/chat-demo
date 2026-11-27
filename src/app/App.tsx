@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useTranslate } from '../i18n/index.js'
 import { useSettings } from '../services/settings.js'
 import { bindHistoryLocation, initHistoryLocation, retryHistoryLocationSave, useHistoryLocation } from '../services/chat/historyLocation.js'
+import { bindChatLocation } from './chatLocation.js'
 import { HistoryLocationDialog } from '../components/settings/HistoryLocationDialog.js'
 import { useIsMobile, useMobileViewport, usePreventPageScroll } from './viewport.js'
 import {
@@ -29,14 +30,16 @@ import { stopReadAloud } from '../services/speech/readAloud.js'
 import { CollapsedSider } from '../components/sider/CollapsedSider.js'
 import { HistorySearch } from '../components/sider/HistorySearch.js'
 import { useHistorySearch } from '../components/sider/historySearchState.js'
-import { closeMobileSider } from '../components/sider/mobileSiderState.js'
+import { closeMobileSider, useMobileSider } from '../components/sider/mobileSiderState.js'
 import { MobileSider, Sider } from '../components/sider/Sider.js'
+import { useMobileSiderSwipe } from '../components/sider/useMobileSiderSwipe.js'
 import styles from './App.module.css'
 
 export const App = () => {
   const t = useTranslate()
   const searching = useHistorySearch(state => state.open)
   const isMobile = useIsMobile()
+  const mobileSiderOpen = useMobileSider((state) => state.open) && isMobile
   const locale = useSettings((state) => state.locale)
   // 移动端侧边栏以独立抽屉管理开合状态
   const siderCollapsed = useSettings((state) => state.siderCollapsed) && !isMobile
@@ -60,6 +63,7 @@ export const App = () => {
   const activeId = useChatStore((state) => state.activeId)
 
   usePreventPageScroll(isMobile)
+  useMobileSiderSwipe(frameRef, isMobile)
 
   useEffect(() => {
     document.documentElement.lang = locale
@@ -67,6 +71,7 @@ export const App = () => {
 
   // 上传失败时，补充显示余额或配额相关提示。
   useEffect(() => onUploadNotice(showToast), [])
+  useEffect(bindChatLocation, [])
   useEffect(bindChatPersistence, [])
   useEffect(bindHistoryLocation, [])
   useEffect(() => {
@@ -111,7 +116,7 @@ export const App = () => {
 
   return (
     <>
-      <div ref={frameRef} className={styles.frame}>
+      <div ref={frameRef} className={styles.frame} data-mobile-sider-open={mobileSiderOpen}>
         {isMobile ? <MobileSider /> : (
           <div className={styles.desktopSider} data-collapsed={siderCollapsed}
             ref={(element) => {
@@ -123,7 +128,7 @@ export const App = () => {
           </div>
         )}
         {!isMobile && <CollapsedSider visible={siderCollapsed} />}
-        <main className={styles.main}>
+        <main className={styles.main} ref={(element) => { if (element) {element.inert = mobileSiderOpen} }}>
           {directorySaveError && (
             <div className={styles.saveError} role="alert">
               <span>{t('historyDirectoryFailed')}</span>
@@ -148,7 +153,8 @@ export const App = () => {
           <div className={styles.content}>
             {!ready || (activeId !== null && !session) ? (
               <div className={styles.loadingView}>
-                {isMobile ? <MobileHeader /> : null}
+                {isMobile ? <MobileHeader title={activeId === null ? undefined :
+                  useChatStore.getState().sessions.find((summary) => summary.id === activeId)?.title || t('untitledChat')} /> : null}
                 <div className={styles.loadingState} role="status" aria-live="polite"
                   aria-busy={!(!ready ? initError : sessionLoadError)}>
                   <span>
@@ -175,6 +181,7 @@ export const App = () => {
               </div>
             ) : session ? (
               <SessionView
+                key={session.id}
                 session={session}
                 streaming={streaming}
                 siderCollapsed={siderCollapsed}

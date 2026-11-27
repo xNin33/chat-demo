@@ -21,6 +21,11 @@
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
+.panel[data-exiting][data-motion='fade'] {
+  pointer-events: none;
+  animation: ds-fade-out var(--ds-transition-duration) var(--ds-ease-in-out) both;
+}
+
 .title {
   flex: 1;
   overflow: hidden;

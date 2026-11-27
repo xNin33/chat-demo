@@ -19,6 +19,16 @@
 
 .preview::backdrop {
   background: rgb(0 0 0 / 92%);
+  animation: preview-in var(--ds-transition-duration) ease-out;
+}
+
+.preview[open][data-exiting],
+.preview[data-exiting]::backdrop {
+  animation: ds-fade-out var(--ds-transition-duration) var(--ds-ease-in-out) both;
+}
+
+.preview[data-exiting] {
+  pointer-events: none;
 }
 
 .stage {

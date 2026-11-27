@@ -1,4 +1,5 @@
 .view {
+  --session-composer-width: min(calc(var(--message-list-max-width) - 64px), calc(100% - 32px));
   position: absolute;
   inset: 0;
   display: flex;
@@ -7,27 +8,29 @@
 
 .header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   flex-shrink: 0;
   height: 60px;
-  padding: 12px 18px 0;
+  padding: var(--desktop-header-top) var(--desktop-header-inset) 0;
   box-sizing: border-box;
   background: var(--dsw-alias-bg-base);
 }
 
 .title {
   field-sizing: content;
-  min-width: 4em;
+  box-sizing: border-box;
+  height: var(--desktop-header-control-height);
+  min-width: 0;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 999px;
   max-width: 480px;
   transition:
-    margin-left var(--sidebar-transition-duration) var(--sidebar-transition-easing),
+    margin-inline-start var(--sidebar-transition-duration) var(--sidebar-transition-easing),
     border-color var(--ds-transition-duration) var(--ds-ease-in-out),
     background-color var(--ds-transition-duration) var(--ds-ease-in-out),
     box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
-  padding: 8px 12px;
+  padding: 0 12px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -47,7 +50,7 @@
 }
 
 .withCollapsedSider {
-  margin-left: 113px;
+  margin-inline-start: calc(var(--collapsed-toolbar-width) + var(--desktop-header-gap));
 }
 
 .inputContainer {
@@ -57,8 +60,7 @@
   flex-direction: column;
   align-items: center;
   box-sizing: border-box;
-  width: calc(var(--message-list-max-width) - 64px);
-  max-width: calc(100% - 32px);
+  width: var(--session-composer-width);
   margin: auto auto 0;
   background: linear-gradient(
     to bottom,
@@ -77,6 +79,40 @@
   text-align: center;
   color: var(--dsw-alias-label-tertiary);
   user-select: none;
+}
+
+.composerSlot {
+  display: contents;
+}
+
+.composerSlot:has([data-message-composer]) {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  overflow: clip;
+}
+
+.composerMask {
+  position: absolute;
+  z-index: 9;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: rgb(0 0 0 / 34%);
+  touch-action: none;
+  animation: ds-fade-in var(--ds-transition-duration) var(--ds-ease-in-out) both;
+}
+
+.composerMask[data-composer-mask='edit'] {
+  background: linear-gradient(
+    to bottom,
+    transparent 15%,
+    color-mix(in srgb, var(--dsw-alias-bg-base) 90%, transparent) 72%
+  );
+}
+
+.view:has([data-message-composer][data-exiting]) .composerMask {
+  animation: ds-fade-out var(--ds-transition-duration-slow) var(--ds-ease-in-out) both;
 }
 
 @media not all and (min-width: 768px) {

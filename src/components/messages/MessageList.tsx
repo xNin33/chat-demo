@@ -58,6 +58,18 @@ export const MessageList = ({
   const searchTarget = useHistorySearch(state => state.target)
   const [focusedMessageId, setFocusedMessageId] = useState<string>()
   const [editingIds, setEditingIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+  const toggleExpanded = useCallback((id: string) => {
+    setExpanded((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
   const { messages, prompts, indices, promptIdsByRow } = useMemo(() => {
     const messages = getVisibleMessages(session)
     const prompts: { message: Prompt; row: number }[] = []
@@ -230,10 +242,13 @@ export const MessageList = ({
     if (searchTarget?.sessionId !== session.id) {return}
     const index = indices.get(searchTarget.messageId)
     if (index !== undefined) {
+      if (messages[index].role === 'user') {
+        setExpanded((current) => current.has(searchTarget.messageId) ? current : new Set([...current, searchTarget.messageId]))
+      }
       virtualizer.scrollToIndex(index, { align: 'start', behavior: 'instant' })
     }
     useHistorySearch.setState({ target: null })
-  }, [indices, searchTarget, session.id, virtualizer])
+  }, [indices, messages, searchTarget, session.id, virtualizer])
 
   const trackEditing = useCallback((id: string, editing: boolean) => {
     setEditingIds((current) => {
@@ -303,6 +318,8 @@ export const MessageList = ({
                       versions={versions.get(message.id) ?? EMPTY_VERSIONS}
                       onSelectVersion={selectVersion}
                       onEditingChange={trackEditing}
+                      expanded={expanded.has(message.id)}
+                      onToggleExpanded={toggleExpanded}
                     />
                   ) : (
                     <AssistantMessage

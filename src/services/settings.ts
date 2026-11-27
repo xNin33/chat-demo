@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { createId } from '../utils/id.js'
+import { API_ORIGIN, EMPTY_CUSTOM_API, messagesEndpoint, NATIVE_MODEL, normalizeEndpoint, type ApiConnection, type ApiMode, type CustomApiSettings } from './api/config.js'
 import type { TtsVoice } from './api/speech.js'
 import { normalizeLocation, type UserLocation } from './location.js'
 
@@ -10,6 +12,9 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 /** 本机设置，存 localStorage：API Key、语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态 */
 type Settings = {
   apiKey: string | null
+  nativeFileScope?: string
+  apiMode: ApiMode
+  customApi: CustomApiSettings & { fileScope?: string }
   locale: Locale
   themePreference: ThemePreference
   location: UserLocation | null
@@ -21,6 +26,9 @@ type Settings = {
 
 const KEYS = {
   apiKey: 'chat-demo:api-key',
+  nativeFileScope: 'chat-demo:native-file-scope',
+  apiMode: 'chat-demo:api-mode',
+  customApi: 'chat-demo:custom-api',
   locale: 'chat-demo:locale',
   location: 'chat-demo:location',
   themePreference: 'chat-demo:theme-preference',
@@ -84,11 +92,36 @@ const initialThemePreference = (): ThemePreference => {
   return saved === 'light' || saved === 'dark' ? saved : 'system'
 }
 
+const initialCustomApi = (): Settings['customApi'] => {
+  try {
+    const saved = JSON.parse(read(KEYS.customApi) ?? 'null')
+    if (saved && typeof saved.endpoint === 'string' && typeof saved.model === 'string' &&
+        typeof saved.apiKey === 'string' && typeof saved.searchEndpoint === 'string' &&
+        typeof saved.searchApiKey === 'string') {
+      return {
+        endpoint: normalizeEndpoint(saved.endpoint) ?? '',
+        model: saved.model,
+        apiKey: saved.apiKey,
+        searchEndpoint: normalizeEndpoint(saved.searchEndpoint) ?? '',
+        searchApiKey: saved.searchApiKey,
+        searchSource: saved.searchSource === 'deepseek' || saved.searchSource === 'custom' ? saved.searchSource : 'off',
+        fileScope: typeof saved.fileScope === 'string' ? saved.fileScope : createId(),
+      }
+    }
+  } catch {
+    // 设置不可读取时使用默认值。
+  }
+  return EMPTY_CUSTOM_API
+}
+
 /** 未保存过时使用服务端默认音色 stella（海星） */
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
 export const useSettings = create<Settings>(() => ({
   apiKey: read(KEYS.apiKey),
+  nativeFileScope: read(KEYS.nativeFileScope) ?? undefined,
+  apiMode: read(KEYS.apiMode) === 'custom' ? 'custom' : 'native',
+  customApi: initialCustomApi(),
   locale: initialLocale(),
   location: initialLocation(),
   themePreference: initialThemePreference(),
@@ -120,8 +153,49 @@ export const setTtsVoice = (ttsVoice: TtsVoice) => {
 }
 
 export const setApiKey = (apiKey: string | null) => {
+  const previous = useSettings.getState()
+  const nativeFileScope = previous.apiKey && previous.apiKey !== apiKey ? createId() : previous.nativeFileScope
   write(KEYS.apiKey, apiKey)
-  useSettings.setState({ apiKey })
+  write(KEYS.nativeFileScope, nativeFileScope ?? null)
+  useSettings.setState({ apiKey, nativeFileScope })
+}
+
+export const setApiMode = (apiMode: ApiMode) => {
+  write(KEYS.apiMode, apiMode)
+  useSettings.setState({ apiMode })
+}
+
+export const setCustomApi = (settings: CustomApiSettings) => {
+  const old = useSettings.getState().customApi
+  const sameConnection = old.endpoint === settings.endpoint && old.apiKey === settings.apiKey
+  const customApi = { ...settings, fileScope: sameConnection && old.fileScope ? old.fileScope : createId() }
+  write(KEYS.customApi, JSON.stringify(customApi))
+  useSettings.setState({ customApi })
+}
+
+export const getChatConnection = (settings = useSettings.getState()): ApiConnection | undefined => {
+  if (settings.apiMode === 'native') {
+    return settings.apiKey ? {
+      mode: 'native', messagesUrl: `${API_ORIGIN}/anthropic/v1/messages`, model: NATIVE_MODEL,
+      apiKey: settings.apiKey, fileScope: settings.nativeFileScope,
+    } : undefined
+  }
+  const custom = settings.customApi
+  if (!custom.endpoint || !custom.model) {
+    return undefined
+  }
+  const connection: ApiConnection = {
+    mode: 'custom', messagesUrl: messagesEndpoint(custom.endpoint), model: custom.model,
+    apiKey: custom.apiKey, fileScope: custom.fileScope,
+  }
+  if (custom.searchSource === 'deepseek' && settings.apiKey) {
+    connection.search = {
+      url: 'https://api.deepseek.com/v1/tools/search', apiKey: settings.apiKey, deepseek: true,
+    }
+  } else if (custom.searchSource === 'custom' && custom.searchEndpoint) {
+    connection.search = { url: custom.searchEndpoint, apiKey: custom.searchApiKey, deepseek: false }
+  }
+  return connection
 }
 
 export const setThinking = (thinking: boolean) => {

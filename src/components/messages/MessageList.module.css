@@ -48,6 +48,10 @@
   outline-offset: 3px;
 }
 
+.footer:has([data-message-composer]) .bottomButton {
+  visibility: hidden;
+}
+
 @media not all and (min-width: 768px) {
   .scroll {
     scrollbar-gutter: auto;

@@ -11,7 +11,7 @@ const subscribe = (onChange: () => void) => {
 export const useIsMobile = () => useSyncExternalStore(subscribe, () => query.matches)
 
 const preventPageScroll = (event: TouchEvent) => {
-  if (event.touches.length !== 1) {
+  if (!event.cancelable || event.defaultPrevented || event.touches.length !== 1) {
     return
   }
   for (
@@ -19,6 +19,9 @@ const preventPageScroll = (event: TouchEvent) => {
     element && element !== document.body;
     element = element.parentElement
   ) {
+    if (element.hasAttribute('data-selectable-message-text')) {
+      return
+    }
     const style = getComputedStyle(element)
     const scrollsY =
       /auto|scroll/.test(style.overflowY) && element.scrollHeight > element.clientHeight

@@ -22,7 +22,7 @@ On Windows, double-click [`restart-server.cmd`](restart-server.cmd) after instal
 
 ## Features
 
-- Search chat history, jump to a matching message, rename chats inline, and select multiple chats to pin or delete. History loads in batches and long chats use a virtualized message list. The desktop conversation rail jumps to prompts and shows the current version and total version count.
+- Search chat history, jump to a matching message, and rename chats inline. Pin or unpin a chat from its three-dot menu, or select multiple chats for batch actions. Open chats include `?chat=<id>` in the URL so refreshing reopens the same conversation from browser storage. History loads in batches and long chats use a virtualized message list. The desktop conversation rail jumps to prompts and shows the current version and total version count.
 - Edit prompts and their attachments to create branches. Switch between versions or regenerate a reply. Stream responses with deep thinking, smart search, link reading, and source citations.
 - Add files by selecting, pasting, or dragging them into the composer. Open images in the app, zoom with the wheel, drag to pan, and switch images with the arrow keys. Click a sent file to open it in the side panel. The panel previews up to 256 KiB of text and offers an original-file download for unsupported formats and truncated previews.
 - Render Markdown, highlighted code, KaTeX math, and Mermaid diagrams. Scroll wide formulas inside their own blocks. Copy or download code blocks and run HTML in a sandboxed preview.
@@ -30,7 +30,9 @@ On Windows, double-click [`restart-server.cmd`](restart-server.cmd) after instal
 
 ## Data and storage
 
-Desktop browsers with a directory picker offer to choose a chat history folder on the first visit to the production app. Chat changes automatically update a `chat-demo-history-*.zip` archive in that folder. You can restore it using the history import in Settings. Choose browser storage to skip setup, or select a folder later under Settings → Data management. The production app stores chats and new attachments in the browser on mobile. Development mode continues to use IndexedDB and the project's `attachments/` directory.
+Desktop browsers with a directory picker offer to choose a chat history folder on the first visit to the production app. If the folder contains a `chat-demo-history-*.zip` or `deepseek_data-*.zip` archive, the app loads the most recently modified backup. It asks before replacing any chats or drafts already in the browser. Changes update the existing automatic backup or create a separate automatic backup alongside a manually exported ZIP.
+
+Choose browser storage to skip setup, or select a folder later under Settings → Data management. The production app stores chats and new attachments in the browser on mobile. Development mode continues to use IndexedDB and the project's `attachments/` directory.
 
 Your API key and settings are stored in localStorage. Conversations and attachment references remain in IndexedDB. On desktop, original attachments are stored on disk under UUIDs, with original filenames in conversation metadata. Sending messages, uploading attachments, and using speech features sends the relevant content to the configured API service.
 
@@ -41,6 +43,14 @@ Deletion and history replacement clean up only removed disk references belonging
 History import and export in Settings use ZIP archives. After confirmation and successful validation, importing replaces all local conversations and attachments. Exports include conversations and locally available original images, but exclude API keys, settings, and original non-image attachments. See the [history import/export documentation (Chinese)](src/services/chat/history/README.md) for the archive format and preservation details.
 
 Settings → Data → Delete all chats clears all local conversations, original attachments, and unsent drafts after confirmation. It stops ongoing replies and returns to a new chat. Your API key and settings are preserved; files already uploaded to the API service are not deleted.
+
+## API modes
+
+In **Settings → Data → API mode**, choose **Native mode** for DeepSeek chat, built-in web tools, and voice. In **Custom mode**, save an Anthropic-compatible Messages endpoint, model ID, and an optional chat key. You can enter the complete endpoint or a common base address ending in `/v1` or `/anthropic`. Attachments use the neighboring `/files` endpoint if supported by the provider. Voice still uses the separately saved DeepSeek key. Browser requests require the endpoints to allow the app's origin through CORS.
+
+In custom mode, select **DeepSeek Search API** after saving a DeepSeek key, or select **Custom search API** and provide a full endpoint and optional bearer key. With search enabled in the composer, the app sends one search per text question, requests up to five results, and passes them to the chat model for citations. DeepSeek bills successful standalone searches. [DeepSeek Search API](https://api-docs.deepseek.com/api/search/) · [Billing](https://api-docs.deepseek.com/guides/search/#billing)
+
+A custom search endpoint accepts `POST` with `{"query":"...","count":5}` and responds with `{"results":[{"url":"https://example.com/","title":"Example","snippet":"…","summary":"…"}]}`. Only `url` is required per result. The chat endpoint and search endpoint use their own keys.
 
 ## Troubleshooting
 

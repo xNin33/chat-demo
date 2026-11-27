@@ -1,20 +1,27 @@
 import { create } from 'zustand'
 import { createId } from '../../utils/id.js'
-import { exportSavedHistory } from './backup.js'
+import { exportSavedHistory, importHistory } from './backup.js'
 import {
+  loadSessionSummaries,
   onHistoryChanged,
   readHistoryLocation,
   reportStorageError,
   writeHistoryLocation,
   type HistoryLocation,
 } from './db.js'
+import { useDrafts } from './drafts.js'
 import { canChooseHistoryDirectory } from './storageMode.js'
+import { useChatStore } from './store.js'
 
 const readWrite = { mode: 'readwrite' } as const
 type PermissionedDirectory = FileSystemDirectoryHandle & {
   queryPermission: (options: typeof readWrite) => Promise<PermissionState>
   requestPermission: (options: typeof readWrite) => Promise<PermissionState>
 }
+type DirectoryWithFiles = FileSystemDirectoryHandle & {
+  values: () => AsyncIterableIterator<FileSystemFileHandle | FileSystemDirectoryHandle>
+}
+type ExistingHistory = { directory: FileSystemDirectoryHandle; archive: FileSystemFileHandle }
 
 type LocationState = {
   location: HistoryLocation | null
@@ -22,6 +29,8 @@ type LocationState = {
   busy: boolean
   needsPermission: boolean
   failed: boolean
+  restoreFailed: boolean
+  pendingRestore: ExistingHistory | null
 }
 
 export const useHistoryLocation = create<LocationState>(() => ({
@@ -30,21 +39,31 @@ export const useHistoryLocation = create<LocationState>(() => ({
   busy: false,
   needsPermission: false,
   failed: false,
+  restoreFailed: false,
+  pendingRestore: null,
 }))
 
 const { getState: get, setState: set } = useHistoryLocation
 const permissionCheck = (directory: FileSystemDirectoryHandle) =>
   (directory as PermissionedDirectory).queryPermission(readWrite)
+const withLocationLock = <T>(run: () => Promise<T>) =>
+  navigator.locks ? navigator.locks.request('chat-demo-history-location', run) : run()
 
 let initialized: Promise<void> | undefined
 let timer: number | undefined
 let saves: Promise<void> = Promise.resolve()
+let restoringHistory = false
 
-export const openHistoryLocation = () => set({ open: true })
+export const openHistoryLocation = () => set({ open: true, restoreFailed: false })
 export const closeHistoryLocation = () => {
   if (!get().busy) {
-    set({ open: false })
+    set({ open: false, pendingRestore: null })
   }
+}
+
+const isSavedLocation = async (location: HistoryLocation) => {
+  const saved = await readHistoryLocation()
+  return saved?.fileName === location.fileName && saved.directory.isSameEntry(location.directory)
 }
 
 const saveArchive = (location: HistoryLocation) => {
@@ -59,7 +78,7 @@ const saveArchive = (location: HistoryLocation) => {
       return
     }
     try {
-      if ((await readHistoryLocation())?.fileName !== location.fileName) {
+      if (!(await isSavedLocation(location))) {
         return
       }
       if ((await permissionCheck(location.directory)) !== 'granted') {
@@ -71,7 +90,7 @@ const saveArchive = (location: HistoryLocation) => {
       const blob = await exportSavedHistory()
       if (
         get().location !== location ||
-        (await readHistoryLocation())?.fileName !== location.fileName
+        !(await isSavedLocation(location))
       ) {
         return
       }
@@ -92,9 +111,7 @@ const saveArchive = (location: HistoryLocation) => {
     }
   }
   saves = saves
-    .then(() =>
-      navigator.locks ? navigator.locks.request('chat-demo-history-location', write) : write()
-    )
+    .then(() => withLocationLock(write))
     .catch(reportFailure)
   return saves
 }
@@ -102,6 +119,12 @@ const saveArchive = (location: HistoryLocation) => {
 export const retryHistoryLocationSave = () => {
   const { location } = get()
   return location ? saveArchive(location) : undefined
+}
+
+const flushHistoryLocationSave = () => {
+  window.clearTimeout(timer)
+  timer = undefined
+  return retryHistoryLocationSave()
 }
 
 export const initHistoryLocation = () => {
@@ -132,20 +155,15 @@ export const bindHistoryLocation = () => {
   if (!canChooseHistoryDirectory) {
     return
   }
-  const flush = () => {
-    window.clearTimeout(timer)
-    timer = undefined
-    void retryHistoryLocationSave()
-  }
   const onVisibilityChange = () => {
     if (timer !== undefined && document.visibilityState === 'hidden') {
-      flush()
+      void flushHistoryLocationSave()
     }
   }
   const unsubscribe = onHistoryChanged(() => {
-    if (get().location && !get().needsPermission) {
+    if (!restoringHistory && get().location && !get().needsPermission) {
       window.clearTimeout(timer)
-      timer = window.setTimeout(flush, 700)
+      timer = window.setTimeout(flushHistoryLocationSave, 700)
     }
   })
   document.addEventListener('visibilitychange', onVisibilityChange)
@@ -156,6 +174,84 @@ export const bindHistoryLocation = () => {
   }
 }
 
+const managedArchive = /^chat-demo-history-.+\.zip$/i
+const exportedArchive = /^deepseek_data-.+\.zip$/i
+const newArchiveName = () => `chat-demo-history-${createId()}.zip`
+
+const findHistoryArchive = async (directory: DirectoryWithFiles) => {
+  let newest: { handle: FileSystemFileHandle; lastModified: number } | undefined
+  for await (const handle of directory.values()) {
+    if (handle.kind !== 'file' ||
+        (!managedArchive.test(handle.name) && !exportedArchive.test(handle.name))) {
+      continue
+    }
+    const { lastModified } = await handle.getFile()
+    if (!newest || lastModified > newest.lastModified ||
+        (lastModified === newest.lastModified && handle.name < newest.handle.name)) {
+      newest = { handle, lastModified }
+    }
+  }
+  return newest?.handle
+}
+
+const saveNewLocation = async (location: HistoryLocation) => {
+  await withLocationLock(async () => {
+    await writeHistoryLocation(location)
+    set({ location, needsPermission: false })
+  })
+  await saveArchive(location)
+  if (!get().failed && !get().needsPermission) {
+    set({ open: false })
+  }
+}
+
+const restoreExistingHistory = async ({ directory, archive }: ExistingHistory) => {
+  const reuseArchive = managedArchive.test(archive.name)
+  const location = { directory, fileName: reuseArchive ? archive.name : newArchiveName() }
+  try {
+    if (timer !== undefined) {
+      await flushHistoryLocationSave()
+    }
+    await withLocationLock(async () => {
+      restoringHistory = true
+      try {
+        await importHistory(await archive.getFile(), location)
+        window.clearTimeout(timer)
+        timer = undefined
+        set({ location, needsPermission: false, pendingRestore: null, open: false, failed: false })
+      } finally {
+        restoringHistory = false
+      }
+    })
+  } catch (error) {
+    reportStorageError('restore history directory')(error)
+    set({ pendingRestore: null, restoreFailed: true })
+    return
+  }
+  // 手动导出的文件保留为快照，后续自动保存到独立文件。
+  if (!reuseArchive) {
+    await saveArchive(location)
+  }
+}
+
+export const cancelHistoryLocationRestore = () => {
+  if (!get().busy) {
+    set({ pendingRestore: null })
+  }
+}
+
+export const confirmHistoryLocationRestore = async () => {
+  const { busy, pendingRestore } = get()
+  if (!busy && pendingRestore) {
+    set({ busy: true })
+    try {
+      await restoreExistingHistory(pendingRestore)
+    } finally {
+      set({ busy: false })
+    }
+  }
+}
+
 export const chooseHistoryLocation = async () => {
   if (!canChooseHistoryDirectory || get().busy) {
     return
@@ -163,21 +259,26 @@ export const chooseHistoryLocation = async () => {
   const picker = Reflect.get(window, 'showDirectoryPicker') as (options: {
     mode: 'readwrite'
     id: string
-  }) => Promise<FileSystemDirectoryHandle>
-  set({ busy: true, failed: false })
+  }) => Promise<DirectoryWithFiles>
+  set({ busy: true, failed: false, restoreFailed: false })
   try {
     const directory = await picker.call(window, { ...readWrite, id: 'chat-demo-history' })
     const previous = get().location
-    const fileName =
-      previous && (await directory.isSameEntry(previous.directory))
-        ? previous.fileName
-        : `chat-demo-history-${createId()}.zip`
-    const location = { directory, fileName }
-    await writeHistoryLocation(location)
-    set({ location, needsPermission: false })
-    await saveArchive(location)
-    if (!get().failed && !get().needsPermission) {
-      set({ open: false })
+    if (previous && (await directory.isSameEntry(previous.directory))) {
+      await saveNewLocation({ directory, fileName: previous.fileName })
+      return
+    }
+    const archive = await findHistoryArchive(directory)
+    if (!archive) {
+      await saveNewLocation({ directory, fileName: newArchiveName() })
+      return
+    }
+    const selection = { directory, archive }
+    if ((await loadSessionSummaries()).length || useChatStore.getState().sessions.length ||
+        useDrafts.getState().drafts.size) {
+      set({ pendingRestore: selection })
+    } else {
+      await restoreExistingHistory(selection)
     }
   } catch (error) {
     if (!(error instanceof DOMException && error.name === 'AbortError')) {
@@ -218,8 +319,10 @@ export const selectBrowserHistory = async () => {
   }
   set({ busy: true })
   try {
-    await writeHistoryLocation(null)
-    set({ location: null, open: false, failed: false, needsPermission: false })
+    await withLocationLock(async () => {
+      await writeHistoryLocation(null)
+      set({ location: null, open: false, failed: false, needsPermission: false, restoreFailed: false })
+    })
   } catch (error) {
     reportStorageError('save history preference')(error)
     set({ failed: true })

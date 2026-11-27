@@ -18,18 +18,103 @@
 
 .option {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
+  border: 0;
   border-radius: 8px;
+  background: transparent;
+  font: inherit;
   font-size: 14px;
   line-height: 24px;
   color: var(--dsw-alias-label-primary);
+  text-align: start;
   cursor: pointer;
   user-select: none;
 
-  &:hover {
+  &:is(:hover, :focus-visible, :active) {
     background-color: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.pressMenu {
+  min-width: min(164px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+
+  &[data-motion='fade'] {
+    animation: press-menu-in min(180ms, var(--ds-transition-duration)) cubic-bezier(0.18, 0.85, 0.25, 1) both;
+  }
+
+  .option {
+    min-height: 44px;
+    box-sizing: border-box;
+    padding-inline: 12px;
+    transition: background-color min(100ms, var(--ds-transition-duration));
+  }
+}
+
+@keyframes press-menu-in {
+  from {
+    opacity: 0;
+    scale: 0.14;
+  }
+}
+
+.menu[data-exiting][data-motion='fade'] {
+  pointer-events: none;
+  animation: ds-fade-out min(140ms, var(--ds-transition-duration)) ease-out both;
+}
+
+.pressMenu[data-exiting][data-motion='fade'] {
+  animation-name: press-menu-out;
+}
+
+@keyframes press-menu-out {
+  to {
+    opacity: 0;
+    scale: 0.82;
+  }
+}
+
+.messageMenu {
+  width: min(188px, calc(100vw - 24px));
+  padding: 4px 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 16px;
+  background-color: var(--dsw-alias-bg-layer-2);
+
+  .option {
+    position: relative;
+    min-height: 44px;
+    padding: 6px 12px;
+    gap: 10px;
+    border-radius: 0;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .option + .option::before {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 12px;
+    height: 1px;
+    background: var(--dsw-alias-border-l2);
+    pointer-events: none;
+  }
+
+  .icon {
+    justify-content: center;
+    flex: 0 0 20px;
+    color: var(--dsw-alias-label-primary);
+
+    > svg {
+      width: 18px;
+      height: 18px;
+    }
   }
 }
 

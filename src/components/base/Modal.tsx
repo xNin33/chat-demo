@@ -1,9 +1,10 @@
 import clsx from 'clsx'
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslate } from '../../i18n/index.js'
 import { IconCloseOutline16 } from './icons.js'
 import { IconButton } from './IconButton.js'
+import { playExit } from './playExit.js'
 import styles from './Modal.module.css'
 
 /** 当前打开的弹窗，后打开的在末尾；叠放时 Esc 只关闭最上层 */
@@ -31,14 +32,16 @@ export const Modal = ({
 }) => {
   const t = useTranslate()
   const titleId = useId()
+  const overlay = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+  const dismiss = useCallback(() => playExit(overlay.current, () => onCloseRef.current()), [])
   useEffect(() => {
     const token = {}
     openModals.push(token)
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && openModals.at(-1) === token) {
-        onCloseRef.current()
+        dismiss()
       }
     }
     document.addEventListener('keydown', onKeyDown)
@@ -46,13 +49,14 @@ export const Modal = ({
       openModals.splice(openModals.indexOf(token), 1)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [])
+  }, [dismiss])
 
   return createPortal(
     <div
+      ref={overlay}
       className={styles.overlay}
       data-motion="fade"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+      onMouseDown={(event) => event.target === event.currentTarget && dismiss()}
     >
       <div
         className={clsx(styles.content, className)}
@@ -71,7 +75,7 @@ export const Modal = ({
               tone="primary"
               icon={<IconCloseOutline16 />}
               aria-label={t('close')}
-              onClick={onClose}
+              onClick={dismiss}
             />
           ) : null}
         </div>

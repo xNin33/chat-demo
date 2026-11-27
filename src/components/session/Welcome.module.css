@@ -32,7 +32,6 @@
   .greeting {
     font-size: 20px;
     line-height: 28px;
-    font-weight: 500;
   }
 }
 
@@ -53,6 +52,7 @@
   .greeting {
     flex-shrink: 0;
     margin: auto 0;
+    font-weight: 700;
   }
 
   .caveat {

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { IconCloseOutline16 } from '../base/icons.js'
+import { closeAnimatedDialog } from '../base/playExit.js'
 import styles from './ImagePreview.module.css'
 
 const FIT = { scale: 1, x: 0, y: 0 }
@@ -138,8 +139,12 @@ export const ImagePreview = ({
       onClose={onClose}
       onClick={(event) => {
         if (event.target === event.currentTarget || event.target === stage.current) {
-          event.currentTarget.close()
+          closeAnimatedDialog(event.currentTarget)
         }
+      }}
+      onCancel={(event) => {
+        event.preventDefault()
+        closeAnimatedDialog(event.currentTarget)
       }}
       onKeyDown={(event) => {
         if (onStep && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
@@ -210,7 +215,7 @@ export const ImagePreview = ({
         type="button"
         className={styles.close}
         aria-label={t('close')}
-        onClick={() => ref.current?.close()}
+        onClick={() => closeAnimatedDialog(ref.current)}
       >
         <IconCloseOutline16 />
       </button>

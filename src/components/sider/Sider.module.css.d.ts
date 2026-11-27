@@ -18,11 +18,11 @@ declare const styles: {
   readonly "settingsIcon": string;
   readonly "settingsLabel": string;
   readonly "collapsed": string;
-  readonly "desktopToggle": string;
   readonly "collapsedGroup": string;
   readonly "drawer": string;
   readonly "drawerMask": string;
   readonly "mobile": string;
+  readonly "mobileSearch": string;
 };
 export = styles;
 

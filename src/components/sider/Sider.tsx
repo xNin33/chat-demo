@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import {
   IconCloseOutline16,
+  IconHistorySearchOutline20,
   IconMultiSelectOutline16,
   IconPanelLeftOutline16,
   IconPinOutline16,
@@ -11,7 +12,7 @@ import {
   IconTrashOutline16,
   NewChatIcon,
 } from '../base/icons.js'
-import { openHistorySearch } from './historySearchState.js'
+import { openHistorySearch, openHistorySearchFrom } from './historySearchState.js'
 import { setSiderCollapsed } from '../../services/settings.js'
 import { groupSessions } from '../../services/chat/sessionGroups.js'
 import {
@@ -154,31 +155,34 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
       }}
     >
       <div className={styles.top}>
-        <div className={styles.appName}>{t('appName')}</div>
-        {!selection && (
+        {mobile && !selection ? (
+          <button className={styles.mobileSearch} type="button"
+            onClick={(event) => openHistorySearchFrom(event.currentTarget)}>
+            <IconHistorySearchOutline20 /> <span>{t('historySearchPlaceholder')}</span>
+          </button>
+        ) : <div className={styles.appName}>{t('appName')}</div>}
+        {!mobile && !selection && (
           <IconButton
             icon={<IconSearchOutline16 />}
             tooltip={t('historySearch')}
             onClick={openHistorySearch}
           />
         )}
-        <div className={mobile ? undefined : styles.desktopToggle}>
-          <IconButton
-            size="m"
-            icon={<IconPanelLeftOutline16 />}
-            tooltip={t('collapseSiderbarButton')}
-            tooltipPlacement="bottom"
-            disabled={busy}
-            onClick={() => {
-              setSelection(null)
-              if (mobile) {
-                closeMobileSider()
-              } else {
-                setSiderCollapsed(true)
-              }
-            }}
-          />
-        </div>
+        <IconButton
+          size="m"
+          icon={<IconPanelLeftOutline16 />}
+          tooltip={t('collapseSiderbarButton')}
+          tooltipPlacement="bottom"
+          disabled={busy}
+          onClick={() => {
+            setSelection(null)
+            if (mobile) {
+              closeMobileSider()
+            } else {
+              setSiderCollapsed(true)
+            }
+          }}
+        />
       </div>
       {selection ? (
         <div className={styles.selectionHeader}>
@@ -192,11 +196,11 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
             onClick={() => setSelection(null)}
           />
         </div>
-      ) : (
+      ) : !mobile ? (
         <button
           type="button"
           className={styles.newChat}
-          aria-keyshortcuts={mobile ? undefined : 'Control+J'}
+          aria-keyshortcuts="Control+J"
           onClick={() => {
             newChat()
             closeMobileSider()
@@ -206,9 +210,9 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
             <NewChatIcon />
           </span>
           {t('newChat')}
-          {!mobile && <span className={styles.newChatShortcut} aria-hidden="true">Ctrl + J</span>}
+          <span className={styles.newChatShortcut} aria-hidden="true">Ctrl + J</span>
         </button>
-      )}
+      ) : null}
       <div className={styles.listWrap}>
         <div ref={listRef} className={styles.list}>
           {!selection && sessions.length > 0 && (
@@ -229,6 +233,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
                   key={session.id}
                   session={session}
                   active={session.id === activeId}
+                  mobile={mobile}
                   onDelete={() => setDeleting([session.id])}
                   selection={
                     selection
@@ -312,14 +317,13 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
 
 /** 移动端抽屉：浮在页面上方，点空白区域关闭。 */
 export const MobileSider = () => {
+  const t = useTranslate()
   const open = useMobileSider((state) => state.open)
-  if (!open) {
-    return null
-  }
   return (
     <>
-      <div className={styles.drawerMask} onClick={closeMobileSider} />
-      <div className={styles.drawer}>
+      <button type="button" className={styles.drawerMask} data-sider-mask aria-label={t('collapseSiderbarButton')}
+        tabIndex={open ? 0 : -1} aria-hidden={!open} onClick={closeMobileSider} />
+      <div className={styles.drawer} aria-hidden={!open} ref={(element) => { if (element) {element.inert = !open} }}>
         <Sider mobile />
       </div>
     </>
