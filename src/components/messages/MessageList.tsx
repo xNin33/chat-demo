@@ -55,7 +55,10 @@ export const MessageList = ({
   const railRef = useRef<HTMLDivElement>(null)
   const restoreScrollRef = useRef<{ messageId: string; top: number } | null>(null)
   const lastPromptRef = useRef<string>()
-  const searchTarget = useHistorySearch(state => state.target)
+  /** 直接写 DOM 时总高度变化不一定触发渲染，由虚拟列表的回调同步滚动状态 */
+  const syncScrollStateRef = useRef(() => {})
+  const syncQueued = useRef(false)
+  const searchTarget = useHistorySearch((state) => state.target)
   const [focusedMessageId, setFocusedMessageId] = useState<string>()
   const [editingIds, setEditingIds] = useState<ReadonlySet<string>>(() => new Set())
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
@@ -125,6 +128,20 @@ export const MessageList = ({
     anchorTo: 'end',
     followOnAppend: !anchorId,
     scrollEndThreshold: STICKY_THRESHOLD,
+    // 行高变化（折叠思考、展开长提问、流式增长）在 ResizeObserver 回调里直接写回位置，
+    // 与本帧绘制同步；否则要等下一次渲染，下方的消息会先停在旧位置再跳下去。
+    directDomUpdates: true,
+    directDomUpdatesMode: 'position',
+    // 回调可能发生在渲染或提交阶段，滚动状态放到微任务里合并更新，仍在绘制之前。
+    onChange: () => {
+      if (!syncQueued.current) {
+        syncQueued.current = true
+        queueMicrotask(() => {
+          syncQueued.current = false
+          syncScrollStateRef.current()
+        })
+      }
+    },
   })
   const totalSize = virtualizer.getTotalSize()
   const rows = virtualizer.getVirtualItems()
@@ -144,6 +161,7 @@ export const MessageList = ({
       setActivePrompt(nearEnd ? lastPromptId : promptIdsByRow[row])
     }
   }, [isMobile, lastPromptId, promptIdsByRow, virtualizer])
+  syncScrollStateRef.current = syncScrollState
 
   // 切换版本后将选择器留在原位置，避免回答长短变化导致操作区跳出视口。
   useLayoutEffect(() => {
@@ -239,11 +257,17 @@ export const MessageList = ({
   )
 
   useLayoutEffect(() => {
-    if (searchTarget?.sessionId !== session.id) {return}
+    if (searchTarget?.sessionId !== session.id) {
+      return
+    }
     const index = indices.get(searchTarget.messageId)
     if (index !== undefined) {
       if (messages[index].role === 'user') {
-        setExpanded((current) => current.has(searchTarget.messageId) ? current : new Set([...current, searchTarget.messageId]))
+        setExpanded((current) =>
+          current.has(searchTarget.messageId)
+            ? current
+            : new Set([...current, searchTarget.messageId])
+        )
       }
       virtualizer.scrollToIndex(index, { align: 'start', behavior: 'instant' })
     }
@@ -287,8 +311,8 @@ export const MessageList = ({
             }
           }}
         >
-          <div className={styles.column} style={{ height: totalSize }}>
-            {rows.map(({ key, index, start }) => {
+          <div ref={virtualizer.containerRef} className={styles.column}>
+            {rows.map(({ key, index }) => {
               const message = messages[index]
               return (
                 <div
@@ -296,7 +320,6 @@ export const MessageList = ({
                   ref={virtualizer.measureElement}
                   className={styles.row}
                   data-index={index}
-                  style={{ top: start }}
                   onFocusCapture={() => setFocusedMessageId(message.id)}
                   onBlurCapture={(event) => {
                     if (!event.currentTarget.contains(event.relatedTarget)) {
@@ -305,7 +328,11 @@ export const MessageList = ({
                   }}
                 >
                   {jumpHighlight?.id === message.id && (
-                    <span key={jumpHighlight.key} className={styles.jumpHighlight} aria-hidden="true" />
+                    <span
+                      key={jumpHighlight.key}
+                      className={styles.jumpHighlight}
+                      aria-hidden="true"
+                    />
                   )}
                   {message.role === 'user' ? (
                     <UserMessage

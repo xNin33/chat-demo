@@ -48,7 +48,7 @@
   outline-offset: 3px;
 }
 
-.footer:has([data-message-composer]) .bottomButton {
+.footer:has([data-island]) .bottomButton {
   visibility: hidden;
 }
 

@@ -1,9 +1,11 @@
+import { useContext } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import { copyText } from '../../utils/clipboard.js'
 import { IconCopyOutline16, IconSelectTextOutline20, IconShareOutline20 } from '../base/icons.js'
 import { Menu, type MenuOption } from '../base/Menu.js'
 import { showToast } from '../base/toastState.js'
 import type { PressPoint } from '../base/useLongPress.js'
+import { OpenMessageComposer, type SelectableText } from '../chatInput/messageComposer.js'
 
 const copyMessage = async (text: string) => {
   if (!(await copyText(text))) {
@@ -29,45 +31,45 @@ const shareMessage = async (text: string) => {
   }
 }
 
+/** 长按消息的操作菜单；「选择文本」把输入框原地换成可选择的消息文字。 */
 export const MessageActionMenu = ({
   point,
-  text,
+  content,
   actions,
-  onSelectText,
   onDismiss,
 }: {
   point: PressPoint | null
-  text?: string
+  content?: SelectableText
   actions: MenuOption[]
-  onSelectText: () => void
   onDismiss: () => void
 }) => {
   const t = useTranslate()
-  if (!point || (!text && actions.length === 0)) {
-    return null
-  }
-  const options: MenuOption[] = text
+  const openComposer = useContext(OpenMessageComposer)
+  const selectable = content?.text ? content : null
+  const options: MenuOption[] = selectable
     ? [
         {
           key: 'copy',
           label: t('copy'),
           icon: <IconCopyOutline16 />,
-          onSelect: () => void copyMessage(text),
+          onSelect: () => void copyMessage(selectable.text),
         },
         {
           key: 'select',
           label: t('selectMessageText'),
           icon: <IconSelectTextOutline20 />,
-          onSelect: onSelectText,
+          onSelect: () => openComposer({ kind: 'text', text: selectable.text }),
         },
         ...actions,
         {
           key: 'share',
           label: t('shareMessage'),
           icon: <IconShareOutline20 />,
-          onSelect: () => void shareMessage(text),
+          onSelect: () => void shareMessage(selectable.text),
         },
       ]
     : actions
-  return <Menu variant="message" point={point} options={options} onDismiss={onDismiss} />
+  return point && options.length > 0 ? (
+    <Menu variant="message" point={point} options={options} onDismiss={onDismiss} />
+  ) : null
 }

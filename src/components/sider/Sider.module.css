@@ -130,6 +130,16 @@
   scrollbar-color: var(--scroll-color) transparent;
 }
 
+/* 多选时横向起手的滑动交给拖选，竖向仍然滚动列表。 */
+.list[data-selecting] {
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.list[data-select-dragging] {
+  cursor: grabbing;
+}
+
 .loadMore {
   height: 1px;
 }
@@ -316,7 +326,8 @@
   left: 0;
   z-index: 1;
   width: var(--mobile-sider-width);
-  translate: calc(var(--mobile-sider-offset) - var(--mobile-sider-width)) 0;
+  /* 抽屉压在会话下面，以 30% 的位移做视差，跟随会话一起滑入。 */
+  translate: calc((var(--mobile-sider-progress) - 1) * var(--mobile-sider-width) * 0.3) 0;
   transition: translate var(--mobile-sider-release);
 }
 
@@ -340,6 +351,10 @@
 
 [data-mobile-sider-open="true"] .drawerMask {
   pointer-events: auto;
+}
+
+[data-ds-dark-theme] .drawerMask {
+  background: rgb(0 0 0 / 45%);
 }
 
 [data-sider-dragging] :is(.drawer, .drawerMask) {

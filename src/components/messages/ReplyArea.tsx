@@ -71,10 +71,24 @@ export const ReplyArea = memo(function ReplyArea({
   if (view.steps.length === 0 && !(message.thinking && streaming)) {
     return null
   }
-  // 未记录请求开关时，按是否有思考内容显示标题。
-  const thinking = message.thinking ?? view.steps.some((step) => step.type === 'thinking')
+  // 有思考内容就显示原版的思考标题，外部模型未记录开关时也一样。
+  const thinking = message.thinking || view.steps.some((step) => step.type === 'thinking')
   const title = thinking ? getAreaTitle(view, streaming, Date.now(), hasResponse) : null
   const stopped = !streaming && !hasResponse
+  const steps = (
+    <div className={styles.steps}>
+      {view.steps.map((step, index) => (
+        <StepItem
+          key={stepKey(step, index)}
+          step={step}
+          message={message}
+          sources={view.sources}
+          streaming={streaming}
+          isLast={index === view.steps.length - 1}
+        />
+      ))}
+    </div>
+  )
   return (
     <div className={styles.area}>
       {title ? (
@@ -86,20 +100,23 @@ export const ReplyArea = memo(function ReplyArea({
           {open ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
         </div>
       ) : null}
-      {open || !title ? (
-        <div className={styles.steps}>
-          {view.steps.map((step, index) => (
-            <StepItem
-              key={stepKey(step, index)}
-              step={step}
-              message={message}
-              sources={view.sources}
-              streaming={streaming}
-              isLast={index === view.steps.length - 1}
-            />
-          ))}
+      {title ? (
+        // 折叠时高度过渡到 0，内容保持挂载；所在行的位置由虚拟列表逐帧同步。
+        <div className={styles.collapse} data-open={open}>
+          <div
+            className={styles.collapseInner}
+            ref={(element) => {
+              if (element) {
+                element.inert = !open
+              }
+            }}
+          >
+            {steps}
+          </div>
         </div>
-      ) : null}
+      ) : (
+        steps
+      )}
     </div>
   )
 })

@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { memo, useContext, useState } from 'react'
-import { useIsMobile } from '../../app/viewport.js'
+import { useIsMobile, usePressMenu } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import { isPreviewImage } from '../../services/attachments.js'
 import { retryUpload, useChatStore } from '../../services/chat/store.js'
@@ -54,7 +54,8 @@ export const UserMessage = memo(function UserMessage({
   const importing = useChatStore((state) => state.importingHistory)
   const editorDisabled = busy || importing
   const [editing, setEditing] = useState(false)
-  const hold = useLongPress(isMobile)
+  const pressMenu = usePressMenu()
+  const hold = useLongPress(pressMenu)
   const changeEditing = (next: boolean) => {
     setEditing(next)
     onEditingChange(message.id, next)
@@ -72,14 +73,13 @@ export const UserMessage = memo(function UserMessage({
   return (
     <div
       className={clsx(styles.container, isFirst && styles.isFirst)}
-      data-press-menu={isMobile ? '' : undefined}
+      data-press-menu={pressMenu ? '' : undefined}
       {...hold.handlers}
     >
       <MessageActionMenu
         point={hold.point}
         onDismiss={hold.dismiss}
-        text={message.content}
-        onSelectText={() => openComposer({ kind: 'text', text: message.content })}
+        content={message.content ? { text: message.content } : undefined}
         actions={menu}
       />
       {editing && !isMobile ? (
@@ -135,9 +135,9 @@ export const UserMessage = memo(function UserMessage({
               </MessageFold>
             </div>
           ) : null}
-          {(!isMobile || versions.ids.length > 1) && (
+          {(!pressMenu || versions.ids.length > 1) && (
             <div className={styles.bottom}>
-              {!isMobile && (
+              {!pressMenu && (
                 <div className={clsx(styles.actions, isLast && styles.alwaysShow)}>
                   {message.content ? <CopyButton text={message.content} /> : null}
                   <IconButton
@@ -145,7 +145,9 @@ export const UserMessage = memo(function UserMessage({
                     tooltip={t('editMessage')}
                     tooltipPlacement="bottom"
                     disabled={editorDisabled}
-                    onClick={() => changeEditing(true)}
+                    onClick={() =>
+                      isMobile ? openComposer({ kind: 'edit', message }) : changeEditing(true)
+                    }
                   />
                 </div>
               )}

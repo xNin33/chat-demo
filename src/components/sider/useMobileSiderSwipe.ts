@@ -1,8 +1,23 @@
 import { useEffect, type RefObject } from 'react'
+import { useSidePreview } from '../files/sidePreviewState.js'
+import { useSearchPanel } from '../search/searchPanelState.js'
 import { closeMobileSider, openMobileSider, useMobileSider } from './mobileSiderState.js'
 
 const ignored =
-  'a, button:not([data-sider-mask]), input, textarea, select, pre, [contenteditable], .katex-display, [role="menu"], [data-selectable-message-text]'
+  'a, button:not([data-sider-mask]), input, textarea, select, pre, [contenteditable], .katex-display, [role="menu"], [data-selectable-message-text], [data-selecting]'
+
+/** 表格、公式、图表等可横向滚动的区域里，横滑交给内容自身滚动。 */
+const inHorizontalScroller = (target: Element | null, root: Element) => {
+  for (let element = target; element && element !== root; element = element.parentElement) {
+    if (
+      element.scrollWidth > element.clientWidth &&
+      /auto|scroll/.test(getComputedStyle(element).overflowX)
+    ) {
+      return true
+    }
+  }
+  return false
+}
 
 /** 横滑时只更新抽屉位移，松手后用原有开关接管动画。 */
 export const useMobileSiderSwipe = (frameRef: RefObject<HTMLDivElement>, enabled: boolean) => {
@@ -29,16 +44,19 @@ export const useMobileSiderSwipe = (frameRef: RefObject<HTMLDivElement>, enabled
     }
     const start = (event: TouchEvent) => {
       const target = event.target as Element | null
+      const open = useMobileSider.getState().open
       if (
         event.touches.length !== 1 ||
         target?.closest(ignored) ||
-        document.querySelector('dialog[open], [aria-modal="true"], [data-composer-mask]')
+        document.querySelector('dialog[open], [aria-modal="true"], [data-composer-mask]') ||
+        // 全屏的搜索结果和文件预览盖住了会话，不能在它们下面拉出抽屉。
+        (!open && (useSearchPanel.getState().entry !== null || useSidePreview.getState().preview !== null)) ||
+        (!open && inHorizontalScroller(target, frame))
       ) {
         reset()
         return
       }
       const { clientX, clientY } = event.touches[0]
-      const open = useMobileSider.getState().open
       gesture = {
         x: clientX,
         y: clientY,

@@ -1,10 +1,12 @@
 import clsx from 'clsx'
 import { memo, useState } from 'react'
+import { usePressMenu } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import {
   IconCheckedOutline14,
   IconEditOutline16,
   IconEllipsisOutline16,
+  IconMultiSelectOutline16,
   IconPinOutline16,
   IconTrashOutline16,
 } from '../base/icons.js'
@@ -21,23 +23,28 @@ export const SessionItem = memo(function SessionItem({
   session,
   active,
   onDelete,
+  onSelectMultiple,
   selection,
   mobile = false,
 }: {
   session: SessionSummary
   active: boolean
   onDelete: () => void
+  /** 进入多选并选中这条会话 */
+  onSelectMultiple?: () => void
   mobile?: boolean
   selection?: { checked: boolean; disabled: boolean; toggle: () => void }
 }) {
   const t = useTranslate()
   const [editing, setEditing] = useState(false)
-  const hold = useLongPress(mobile && !editing && !selection)
+  // 窄窗口里的鼠标用户没有长按，继续显示「更多」按钮。
+  const pressMenu = usePressMenu() && !!mobile
+  const hold = useLongPress(pressMenu && !editing && !selection)
   const displayTitle = session.title || t('untitledChat')
 
   if (selection) {
     return (
-      <label className={clsx(styles.item, styles.selectionItem)}>
+      <label className={clsx(styles.item, styles.selectionItem)} data-session-id={session.id}>
         <input
           type="checkbox"
           checked={selection.checked}
@@ -86,7 +93,7 @@ export const SessionItem = memo(function SessionItem({
   return (
     <div
       className={clsx(styles.item, active && styles.active)}
-      data-press-menu={mobile ? '' : undefined}
+      data-press-menu={pressMenu ? '' : undefined}
       data-press-pulse={hold.pulsing || undefined}
       {...hold.handlers}
       onClick={() => {
@@ -106,6 +113,16 @@ export const SessionItem = memo(function SessionItem({
               icon: <IconPinOutline16 />,
               onSelect: () => void togglePin(),
             },
+            ...(onSelectMultiple
+              ? [
+                  {
+                    key: 'select',
+                    label: t('multiSelectSessions'),
+                    icon: <IconMultiSelectOutline16 />,
+                    onSelect: onSelectMultiple,
+                  },
+                ]
+              : []),
             {
               key: 'rename',
               label: t('sessionItemMenuRenameOption'),
@@ -121,7 +138,7 @@ export const SessionItem = memo(function SessionItem({
             },
           ]}
         >
-          {mobile
+          {pressMenu
             ? undefined
             : ({ open, toggle }) => (
                 <IconButton

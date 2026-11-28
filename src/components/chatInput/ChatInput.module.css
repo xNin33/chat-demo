@@ -14,72 +14,92 @@
   overflow: hidden;
 }
 
-.composeBody:not([hidden]) {
-  display: contents;
-}
-
-.wrapper[data-message-composer] {
-  min-height: min(calc(var(--composer-draft-height, 0px) + 12px), var(--composer-max-height));
+/*
+ * 「编辑」「选择文本」：输入框贴着底边向上展开，输入区换成对应内容，底部功能栏保留。
+ * 内容从底部排起，高度动画中超出的部分从顶部裁掉，功能栏始终贴底不动。
+ */
+.wrapper[data-island] {
+  position: absolute;
+  inset: auto 0 0;
+  justify-content: flex-end;
   cursor: auto;
 }
 
-.wrapper[data-message-composer][data-composer-entering] {
-  animation: composer-slide-in var(--ds-transition-duration-slow) cubic-bezier(0.2, 0.72, 0.25, 1);
-}
-
-.wrapper[data-message-composer][data-exiting] {
+.wrapper[data-island][data-exiting] {
   pointer-events: none;
-  animation: composer-slide-out var(--ds-transition-duration-slow) var(--ds-ease-in-out) both;
 }
 
-@keyframes composer-slide-in {
-  from {
-    translate: 0 var(--composer-entry-offset);
-  }
-  to {
-    translate: 0 0;
-  }
-}
-
-@keyframes composer-slide-out {
-  from {
-    translate: var(--composer-exit-start);
-  }
-  to {
-    translate: 0 var(--composer-exit-offset);
-  }
-}
-
-.messagePanel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.messagePanelHeader {
+.islandHeader {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: space-between;
   min-height: 42px;
   padding: 0 10px 0 16px;
+  box-sizing: border-box;
   font-size: 14px;
   font-weight: 500;
   background: var(--dsw-alias-interactive-bg-hover);
+  user-select: none;
 }
 
-.messagePanelBody {
-  flex: 1;
+/* 编辑复用同一个文本框，随文字增高，超过面板上限后在框内滚动。 */
+.wrapper[data-message-composer] .textareaWrapper {
+  flex: 0 1 auto;
   min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
 }
 
+.wrapper[data-message-composer] .mirror {
+  max-height: none;
+}
+
+/* 选择文本：固定高度的面板，标题居中并带把手，不用灰色底。 */
+.wrapper[data-message-composer='text'] {
+  height: min(var(--composer-max-height), 75dvh);
+}
+
+.wrapper[data-message-composer='text'] .islandHeader {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  min-height: 56px;
+  padding: 8px 10px 0;
+  background: none;
+}
+
+.wrapper[data-message-composer='text'] .islandTitle {
+  grid-column: 2;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  text-align: center;
+  color: var(--dsw-alias-label-primary);
+}
+
+.wrapper[data-message-composer='text'] .islandHeader > button {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.grabber {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: var(--dsw-alias-border-l2);
+}
+/* 选择文本：标题栏下只放可自由选择的消息原文，填满面板，超出时在框内滚动。 */
 .selectableMessage {
+  flex: 1 1 auto;
+  min-height: 0;
   box-sizing: border-box;
-  min-height: 90px;
   padding: 12px 16px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.65;
@@ -87,6 +107,11 @@
   -webkit-user-select: text;
   user-select: text;
   cursor: text;
+}
+
+.wrapper[data-island] .attachments,
+.wrapper[data-island] .functionRow {
+  flex-shrink: 0;
 }
 
 .session {
@@ -415,7 +440,7 @@
   margin-left: auto;
 }
 
-@media (max-width: 767px) {
+@media not all and (min-width: 768px) {
   .functionRow {
     flex-wrap: wrap;
     gap: 6px;

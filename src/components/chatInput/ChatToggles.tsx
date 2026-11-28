@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, type MouseEvent } from 'react'
 import { useIsMobile } from '../../app/viewport.js'
 import { useTranslate } from '../../i18n/index.js'
 import { getChatConnection, setSearch, setThinking, useSettings } from '../../services/settings.js'
@@ -7,6 +7,9 @@ import { IconGlobeLanguageOutline14, IconThinkOutline14 } from '../base/icons.js
 import { Tooltip } from '../base/Tooltip.js'
 import { openSettings } from '../settings/settingsDialogState.js'
 import styles from './ChatInput.module.css'
+
+/** 点开关时不抢走文本框的焦点，键盘保持弹出，输入框不会因收起键盘而跳动。 */
+const keepFocus = (event: MouseEvent) => event.preventDefault()
 
 export const ChatToggles = ({ allowSettings = true }: { allowSettings?: boolean }) => {
   const t = useTranslate()
@@ -47,6 +50,7 @@ export const ChatToggles = ({ allowSettings = true }: { allowSettings?: boolean 
             className={clsx(styles.toggle, thinking && styles.selected)}
             aria-label={t('thinkingSwitch')}
             aria-pressed={thinking}
+            onMouseDown={keepFocus}
             onClick={() => setThinking(!thinking)}
           >
             <IconThinkOutline14 />
@@ -60,6 +64,7 @@ export const ChatToggles = ({ allowSettings = true }: { allowSettings?: boolean 
           className={clsx(styles.toggle, search && styles.selected)}
           aria-label={t('search')}
           aria-pressed={search}
+          onMouseDown={keepFocus}
           disabled={!searchAvailable && !allowSettings}
           onClick={() => (searchAvailable ? setSearch(!search) : openSettings('data'))}
         >

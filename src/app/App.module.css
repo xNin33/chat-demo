@@ -1,7 +1,8 @@
 .frame {
   --desktop-sider-width: 261px;
   --sidebar-transition-duration: min(var(--ds-transition-duration-slow), 280ms);
-  --sidebar-transition-easing: cubic-bezier(0.4, 0, 0.3, 1);
+  /* 起步快、收尾长，桌面端收起展开时跟手且落点柔和 */
+  --sidebar-transition-easing: cubic-bezier(0.2, 0, 0, 1);
   --sidebar-toolbar-fade: min(var(--ds-transition-duration), 120ms);
   --sidebar-toolbar-delay: min(var(--ds-transition-duration-slow), 120ms);
   --desktop-header-top: 12px;
@@ -100,15 +101,18 @@
     --mobile-sider-progress: 0;
     --mobile-sider-offset: calc(var(--mobile-sider-width) * var(--mobile-sider-progress));
     --mobile-sider-scale: calc(1 - 0.045 * var(--mobile-sider-progress));
-    --mobile-sider-release: var(--sidebar-transition-duration) cubic-bezier(0.16, 1, 0.3, 1);
+    /* 抽屉与底部面板共用一条减速曲线：松手时的初速度接近手指速度，结尾没有拖尾。 */
+    --mobile-sider-release: var(--ds-transition-duration-slow) var(--ds-sheet-ease);
     position: fixed;
     top: var(--app-viewport-top, 0px);
     bottom: auto;
     height: var(--app-viewport-height, 100dvh);
   }
 
+  /* 打开的位移更长，略放慢；关闭沿用较短的时长。 */
   .frame[data-mobile-sider-open="true"] {
     --mobile-sider-progress: 1;
+    --mobile-sider-release: calc(var(--ds-transition-duration-slow) * 1.2) var(--ds-sheet-ease);
   }
 
   .main {

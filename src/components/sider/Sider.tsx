@@ -28,6 +28,7 @@ import { showToast } from '../base/toastState.js'
 import { openSettings } from '../settings/settingsDialogState.js'
 import { closeMobileSider, useMobileSider } from './mobileSiderState.js'
 import { SessionItem } from './SessionItem.js'
+import { useSessionSelectDrag } from './useSessionSelectDrag.js'
 import styles from './Sider.module.css'
 
 const SESSION_BATCH_SIZE = 40
@@ -67,6 +68,17 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const count = selected.length
   const allPinned = count > 0 && selected.every((session) => session.pinned)
   const actionsDisabled = busy || importing || count === 0
+  const visibleIds = useMemo(
+    () => visibleGroups.flatMap((group) => group.sessions.map((session) => session.id)),
+    [visibleGroups]
+  )
+  const selectDrag = useSessionSelectDrag({
+    listRef,
+    ids: visibleIds,
+    selection,
+    disabled: busy || importing,
+    setSelection,
+  })
 
   const pinSelected = async () => {
     setBusy(true)
@@ -214,7 +226,12 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
         </button>
       ) : null}
       <div className={styles.listWrap}>
-        <div ref={listRef} className={styles.list}>
+        <div
+          ref={listRef}
+          className={styles.list}
+          data-selecting={selection ? '' : undefined}
+          {...selectDrag}
+        >
           {!selection && sessions.length > 0 && (
             <div className={styles.listTools}>
               <IconButton
@@ -235,6 +252,7 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
                   active={session.id === activeId}
                   mobile={mobile}
                   onDelete={() => setDeleting([session.id])}
+                  onSelectMultiple={importing ? undefined : () => setSelection(new Set([session.id]))}
                   selection={
                     selection
                       ? {

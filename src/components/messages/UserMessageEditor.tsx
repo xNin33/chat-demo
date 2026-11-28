@@ -1,4 +1,3 @@
-import clsx from 'clsx'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
 import {
@@ -23,19 +22,10 @@ import type { UserMessage } from '../../services/chat/types.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
-import {
-  IconAttachPlus20,
-  IconCloseFill14,
-  IconPaperclipOutline16,
-  IconSendOutline16,
-} from '../base/icons.js'
+import { IconCloseFill14, IconPaperclipOutline16 } from '../base/icons.js'
 import { showToast } from '../base/toastState.js'
-import { ChatToggles } from '../chatInput/ChatToggles.js'
-import composerStyles from '../chatInput/ChatInput.module.css'
 import { DraftAttachments } from '../chatInput/DraftAttachments.js'
 import { hasDraggedFiles } from '../chatInput/DragMask.js'
-import { MobileAttachmentPicker } from '../chatInput/MobileAttachmentPicker.js'
-import type { CloseMessageComposer } from '../chatInput/messageComposer.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
 import { MessageFile } from './MessageFile.js'
 import styles from './UserMessage.module.css'
@@ -44,21 +34,19 @@ export const UserMessageEditor = ({
   sessionId,
   message,
   busy,
-  mobile = false,
   onClose,
 }: {
   sessionId: string
   message: UserMessage
   busy: boolean
-  mobile?: boolean
-  onClose: CloseMessageComposer
+  /** 传入 submit 时先提交，成功后再收起 */
+  onClose: (submit?: () => boolean) => void
 }) => {
   const t = useTranslate()
   const [draft, setDraft] = useState(message.content)
   const [attachmentDraft] = useState(() => Symbol())
   const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(() => new Set())
   const [dragging, setDragging] = useState(false)
-  const [attachmentOpen, setAttachmentOpen] = useState(false)
   const dragDepth = useRef(0)
   const pickerRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -85,12 +73,12 @@ export const UserMessageEditor = ({
   useLayoutEffect(() => {
     const textarea = textareaRef.current
     if (textarea) {
-      textarea.focus({ preventScroll: mobile })
+      textarea.focus()
       const end = textarea.value.length
       textarea.setSelectionRange(end, end)
       textarea.scrollTop = textarea.scrollHeight
     }
-  }, [mobile])
+  }, [])
 
   const addFiles = (selected: File[]) => {
     if (selected.length && !disabled && ensureApiKey()) {
@@ -117,7 +105,6 @@ export const UserMessageEditor = ({
   return (
     <div
       className={styles.editor}
-      data-editor-composer={mobile}
       onDragEnter={(event) => {
         if (hasDraggedFiles(event)) {
           event.preventDefault()
@@ -191,7 +178,7 @@ export const UserMessageEditor = ({
           }
         }}
         onKeyDown={(event) => {
-          if (mobile || event.nativeEvent.isComposing) {
+          if (event.nativeEvent.isComposing) {
             return
           }
           if (event.key === 'Escape') {
@@ -202,72 +189,32 @@ export const UserMessageEditor = ({
           }
         }}
       />
-      {mobile ? (
-        <>
-          <div className={composerStyles.functionRow}>
-            <ChatToggles allowSettings={false} />
-            <div className={composerStyles.right}>
-              <IconButton
-                size="m"
-                tone="primary"
-                icon={<IconAttachPlus20 />}
-                className="attachment-plus"
-                aria-label={t(attachmentOpen ? 'attachmentCloseTray' : 'attachmentOpenTray')}
-                aria-expanded={attachmentOpen}
-                disabled={disabled}
-                onClick={() => {
-                  textareaRef.current?.blur()
-                  setAttachmentOpen((open) => !open)
-                }}
-              />
-              <button
-                type="button"
-                className={clsx(
-                  composerStyles.sendButton,
-                  (disabled || !ready) && composerStyles.disabled
-                )}
-                aria-label={t('send')}
-                disabled={disabled || !ready}
-                onClick={send}
-              >
-                <IconSendOutline16 />
-              </button>
-            </div>
-          </div>
-          <MobileAttachmentPicker
-            open={attachmentOpen}
-            close={() => setAttachmentOpen(false)}
-            onFiles={addFiles}
-          />
-        </>
-      ) : (
-        <div className={styles.editorActions}>
-          <input
-            ref={pickerRef}
-            type="file"
-            accept={ACCEPT}
-            multiple
-            hidden
-            onChange={(event) => {
-              addFiles(Array.from(event.currentTarget.files ?? []))
-              event.currentTarget.value = ''
-            }}
-          />
-          <IconButton
-            icon={<IconPaperclipOutline16 />}
-            tooltip={t('uploadFile')}
-            tone="primary"
-            disabled={disabled}
-            onClick={() => pickerRef.current?.click()}
-          />
-          <Button size="s" variant="outlined" onClick={() => onClose()}>
-            {t('cancel')}
-          </Button>
-          <Button size="s" disabled={disabled || !ready} onClick={send}>
-            {t('send')}
-          </Button>
-        </div>
-      )}
+      <div className={styles.editorActions}>
+        <input
+          ref={pickerRef}
+          type="file"
+          accept={ACCEPT}
+          multiple
+          hidden
+          onChange={(event) => {
+            addFiles(Array.from(event.currentTarget.files ?? []))
+            event.currentTarget.value = ''
+          }}
+        />
+        <IconButton
+          icon={<IconPaperclipOutline16 />}
+          tooltip={t('uploadFile')}
+          tone="primary"
+          disabled={disabled}
+          onClick={() => pickerRef.current?.click()}
+        />
+        <Button size="s" variant="outlined" onClick={() => onClose()}>
+          {t('cancel')}
+        </Button>
+        <Button size="s" disabled={disabled || !ready} onClick={send}>
+          {t('send')}
+        </Button>
+      </div>
       {dragging && !disabled && (
         <div className={styles.editorDrop} role="status">
           <span>{t('dragFileToUpload')}</span>

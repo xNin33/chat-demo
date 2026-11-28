@@ -123,16 +123,6 @@
   flex: none;
 }
 
-.editor[data-editor-composer="true"] {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-  border: 0;
-  border-radius: 0;
-  overflow: visible;
-  background: transparent;
-}
-
 .textarea {
   display: block;
   width: 100%;
@@ -148,15 +138,6 @@
   line-height: 24px;
   color: var(--dsw-alias-label-primary);
   background: transparent;
-}
-
-.editor[data-editor-composer="true"] .textarea {
-  flex: 1 0 auto;
-  min-height: 56px;
-  max-height: none;
-  padding-inline: 16px;
-  overscroll-behavior: contain;
-  caret-color: var(--dsw-alias-brand-text);
 }
 
 .editorActions {

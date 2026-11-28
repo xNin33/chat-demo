@@ -1,7 +1,7 @@
 import { useTranslate } from '../../i18n/index.js'
 import clsx from 'clsx'
-import { memo, useContext } from 'react'
-import { useIsMobile } from '../../app/viewport.js'
+import { memo } from 'react'
+import { usePressMenu } from '../../app/viewport.js'
 import {
   IconPlayMediaOutline16,
   IconRefreshOutline16,
@@ -15,6 +15,7 @@ import {
   describeReadAloudError,
   stopReadAloud,
   toggleReadAloud,
+  useReadAloud,
 } from '../../services/speech/readAloud.js'
 import { useSettings } from '../../services/settings.js'
 import type { AssistantMessage as AssistantMessageType } from '../../services/chat/types.js'
@@ -30,7 +31,6 @@ import { toggleSearchPanel, useSearchPanel } from '../search/searchPanelState.js
 import { ReadAloudButton } from './ReadAloudButton.js'
 import { CopyButton } from './CopyButton.js'
 import { MessageActionMenu } from './MessageActionMenu.js'
-import { OpenMessageComposer } from '../chatInput/messageComposer.js'
 import { ReplyArea } from './ReplyArea.js'
 import { useReplyView } from './useReplyView.js'
 import {
@@ -58,9 +58,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   onSelectVersion: SelectMessageVersion
 }) {
   const t = useTranslate()
-  const isMobile = useIsMobile()
-  const hold = useLongPress(isMobile)
-  const openComposer = useContext(OpenMessageComposer)
+  const pressMenu = usePressMenu()
+  const hold = useLongPress(pressMenu)
   const native = useSettings((state) => state.apiMode === 'native')
   const view = useReplyView(message, streaming)
   const panelEntry = useSearchPanel((state) => state.entry)
@@ -72,6 +71,7 @@ export const AssistantMessage = memo(function AssistantMessage({
     .filter(Boolean)
     .join('\n\n')
   const copyText = responseText || notice?.text
+  const reading = useReadAloud((state) => state.messageId === message.id && state.status !== 'idle')
   const waiting = streaming && view.steps.length === 0 && !view.answer && !message.thinking
   const summaryEntry = `${message.id}-summary`
   const regenerate = () => {
@@ -89,7 +89,7 @@ export const AssistantMessage = memo(function AssistantMessage({
     if (responseText) {
       menu.push({
         key: 'read',
-        label: t('ttsPlay'),
+        label: t(reading ? 'ttsStop' : 'ttsPlay'),
         icon: <IconPlayMediaOutline16 />,
         onSelect: () => {
           if (ensureDeepSeekKey()) {
@@ -104,19 +104,14 @@ export const AssistantMessage = memo(function AssistantMessage({
   return (
     <div
       className={styles.message}
-      data-press-menu={isMobile ? '' : undefined}
+      data-press-menu={pressMenu ? '' : undefined}
       data-press-pulse={hold.pulsing || undefined}
       {...hold.handlers}
     >
       <MessageActionMenu
         point={hold.point}
         onDismiss={hold.dismiss}
-        text={copyText}
-        onSelectText={() => {
-          if (copyText) {
-            openComposer({ kind: 'text', text: copyText })
-          }
-        }}
+        content={copyText ? { text: copyText } : undefined}
         actions={menu}
       />
       {refused ? null : (
@@ -203,11 +198,11 @@ export const AssistantMessage = memo(function AssistantMessage({
         <div className={styles.bottom}>
           <BranchSwitcher versions={versions} disabled={busy} onSelect={onSelectVersion} />
           <div className={clsx(styles.actions, isLast && styles.alwaysShow)}>
-            {!isMobile && copyText ? <CopyButton text={copyText} /> : null}
+            {!pressMenu && copyText ? <CopyButton text={copyText} /> : null}
             {responseText && !refused ? (
               <ReadAloudButton messageId={message.id} text={responseText} />
             ) : null}
-            {!isMobile && (
+            {!pressMenu && (
               <IconButton
                 icon={<IconRefreshOutline16 />}
                 tooltip={t('regenerate')}

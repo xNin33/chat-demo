@@ -1,4 +1,6 @@
 :root {
+  /* 底部面板、抽屉等跟手元素的进出曲线 */
+  --ds-sheet-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --message-list-max-width: 840px;
   --message-list-padding-horizontal: 44px;
 }

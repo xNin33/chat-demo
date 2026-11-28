@@ -190,7 +190,7 @@ export const getChatConnection = (settings = useSettings.getState()): ApiConnect
   }
   if (custom.searchSource === 'deepseek' && settings.apiKey) {
     connection.search = {
-      url: 'https://api.deepseek.com/v1/tools/search', apiKey: settings.apiKey, deepseek: true,
+      url: `${API_ORIGIN}/v1/tools/search`, apiKey: settings.apiKey, deepseek: true,
     }
   } else if (custom.searchSource === 'custom' && custom.searchEndpoint) {
     connection.search = { url: custom.searchEndpoint, apiKey: custom.searchApiKey, deepseek: false }

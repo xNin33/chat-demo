@@ -85,34 +85,27 @@
   display: contents;
 }
 
-.composerSlot:has([data-message-composer]) {
+/* 展开期间占位保持原输入框高度，展开的输入框从这里向上长出。 */
+.composerSlot:has([data-island]) {
+  position: relative;
   display: block;
   width: 100%;
-  overflow: hidden;
-  overflow: clip;
+  height: var(--composer-rest-height);
 }
 
+/* 透明度由展开、收起的动画驱动，与输入框高度在同一条时间线上。 */
 .composerMask {
   position: absolute;
   z-index: 9;
   inset: 0;
   padding: 0;
   border: 0;
-  background: rgb(0 0 0 / 34%);
   touch-action: none;
-  animation: ds-fade-in var(--ds-transition-duration) var(--ds-ease-in-out) both;
-}
-
-.composerMask[data-composer-mask='edit'] {
   background: linear-gradient(
     to bottom,
     transparent 15%,
     color-mix(in srgb, var(--dsw-alias-bg-base) 90%, transparent) 72%
   );
-}
-
-.view:has([data-message-composer][data-exiting]) .composerMask {
-  animation: ds-fade-out var(--ds-transition-duration-slow) var(--ds-ease-in-out) both;
 }
 
 @media not all and (min-width: 768px) {

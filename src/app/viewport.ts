@@ -1,14 +1,29 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
 
-/** 窄于 768px 按移动端布局 */
-const query = window.matchMedia('not all and (min-width: 768px)')
-
-const subscribe = (onChange: () => void) => {
-  query.addEventListener('change', onChange)
-  return () => query.removeEventListener('change', onChange)
+const watchMedia = (media: string) => {
+  const query = window.matchMedia(media)
+  return {
+    subscribe: (onChange: () => void) => {
+      query.addEventListener('change', onChange)
+      return () => query.removeEventListener('change', onChange)
+    },
+    matches: () => query.matches,
+  }
 }
 
-export const useIsMobile = () => useSyncExternalStore(subscribe, () => query.matches)
+/** 窄于 768px 按移动端布局 */
+const mobileQuery = watchMedia('not all and (min-width: 768px)')
+/** 主要输入设备无法悬停（触屏）。窄窗口下的鼠标用户仍保留悬停操作按钮。 */
+const touchQuery = watchMedia('(hover: none)')
+
+export const useIsMobile = () => useSyncExternalStore(mobileQuery.subscribe, mobileQuery.matches)
+
+/** 移动端触屏用长按菜单代替消息和会话上的操作按钮 */
+export const usePressMenu = () => {
+  const mobile = useIsMobile()
+  const touch = useSyncExternalStore(touchQuery.subscribe, touchQuery.matches)
+  return mobile && touch
+}
 
 const preventPageScroll = (event: TouchEvent) => {
   if (!event.cancelable || event.defaultPrevented || event.touches.length !== 1) {

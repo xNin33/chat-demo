@@ -17,6 +17,29 @@
   }
 }
 
+.collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--ds-transition-duration-slow) var(--ds-sheet-ease);
+
+  &[data-open='false'] {
+    grid-template-rows: 0fr;
+  }
+}
+
+.collapseInner {
+  min-height: 0;
+  /* 左右留出余量，不裁掉悬停时向外延伸的背景 */
+  margin-inline: -12px;
+  padding-inline: 12px;
+  overflow: hidden;
+  transition: opacity var(--ds-transition-duration-slow) var(--ds-sheet-ease);
+
+  [data-open='false'] > & {
+    opacity: 0;
+  }
+}
+
 .titleIcon {
   display: flex;
   margin-right: 6px;
